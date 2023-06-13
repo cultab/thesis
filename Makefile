@@ -1,5 +1,5 @@
 render:
-	R --quiet -e "require(rmarkdown);render('report.rmd');"
+	R --quiet -e "require(rmarkdown); render('report.rmd', output_format='all');"
 
 submit:
 	cp report.pdf 171014.pdf

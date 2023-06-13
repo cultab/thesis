@@ -8,13 +8,14 @@ subtitle: |
 author: Ευάγγελος Κατσανδρής (cs171014@uniwa.gr)
 date: "`r Sys.setlocale('LC_TIME', 'el_GR.utf8'); format(Sys.time(), '%d %B, %Y')`"
 output: 
-    bookdown::pdf_document2
+    bookdown::pdf_document2:
         template: eisvogel
         highlight: kate
         latex_engine: lualatex
         number_sections: true
         toc: false
         citation_package: biblatex
+        # pandoc_args: [ "--listings" ]
     # bookdown::html_document2:  # disable html output by default
         # fig_caption: true
         # number_sections: true
@@ -52,9 +53,11 @@ header-includes:
     \usepackage{multicol}
     \usepackage{xcolor}
     \usepackage{tocloft}
+    \usepackage{drawstack}
     \definecolor{uniwalightblue}{RGB}{103, 173, 224}
     \definecolor{uniwablue}{RGB}{18, 60, 100}
     \definecolor{uniwaorange}{RGB}{230, 124, 23}
+    \definecolor{light-gray}{gray}{0.95}
     \usepackage{hyperref}
     \hypersetup{
         linkcolor  = uniwalightblue,
@@ -106,10 +109,12 @@ header-includes:
 
 <!-- }}} -->
 
-\renewcommand*{\lstlistlistingname}{Κατάλογος Κώδικα}
-\renewcommand*{\lstlistingname}{Κώδικας}
+<!-- \renewcommand*{\lstlistlistingname}{Κατάλογος Κώδικα} -->
+<!-- \renewcommand*{\lstlistingname}{Κώδικας} -->
 
 \newcommand\autonameref[1]{\autoref{#1}, {\nameref{#1}}}
+
+\newcommand{\code}[1]{\colorbox{light-gray}{\texttt#1}}
 
 \tableofcontents
 
@@ -117,7 +122,7 @@ header-includes:
 
 \listoftables
 
-\lstlistoflistings
+<!-- \lstlistoflistings -->
 
 \newpage
 

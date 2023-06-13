@@ -1,0 +1,33 @@
+\usepackage{tikz}
+% \newfontfamily\greekfont{LiberationSerif}
+% \newfontfamily\greekfontsf{LiberationSerif}
+% \newfontfamily\greekfonttt{LiberationMono}
+\usepackage{float}
+\usepackage{subcaption}
+% \usepackage{pgf}
+% \usepackage{tikzscale}
+% \usepackage{pgfplots}
+\usepackage{chngcntr}
+\counterwithin{figure}{section}
+% \pgfplotsset{compat=1.17}
+% \usepackage{svg}
+% \usepackage{multicol}
+\usepackage{xcolor}
+% \usepackage{tocloft}
+% \usepackage{drawstack}
+\definecolor{uniwalightblue}{RGB}{103, 173, 224}
+\definecolor{uniwablue}{RGB}{18, 60, 100}
+\definecolor{uniwaorange}{RGB}{230, 124, 23}
+\definecolor{light-gray}{gray}{0.95}
+\usepackage{hyperref}
+\hypersetup{
+    linkcolor  = uniwalightblue,
+    citecolor  = uniwaorange,
+    urlcolor   = uniwablue,
+    colorlinks = true,
+}
+\urlstyle{same}
+
+\newcommand*\circled[1]{\tikz[baseline=(char.base)]{
+    \node[shape=circle,draw,inner sep=1.6] (char) {#1};}
+}

@@ -1,0 +1,69 @@
+project:
+  render:
+    - Thesis.qmd
+
+# book:
+#   chapters:
+    # - titlepage.qmd
+    # - copyright.qmd
+    # - thanks.qmd
+    # - abstract.qmd
+    # - tables_of_contents.qmd
+    # - index.qmd # keywords :P
+    # - intro.qmd
+    # - classification.qmd
+
+title: "Parallel Classification using Support Vector Machines on Modern GPUs"
+author: Ευάγγελος Κατσανδρής (cs171014@uniwa.gr)
+subtitle: |
+    | Πανεπιστήμιο Δυτικής Αττικής
+    | Τμήμα Μηχανικών Πληροφορικής και Υπολογιστών
+    | \includegraphics{./img/logo.jpg}
+    | Υπότιτλος
+date: now
+date-format: dddd MMMM D, YYYY
+
+format:
+    pdf:
+        # template: /home/evan/.pandoc/templates/eisvogel.latex
+        # template: /home/evan/.pandoc/templates/new.latex # rec
+        highlight-style: github
+        toc: false
+        number-depth: 3
+        number-sections: true
+        # listings: true
+        include-in-header: # ok
+            - file: packages.tex
+            - file: macros.tex
+        keep-tex: true # ok
+        cite-method: biblatex # ok
+        documentclass: scrreprt # ok ?
+        # documentclass: report # ok ?
+        geometry: margin=2.54cm
+        papersize: a4 # ok
+        fontsize: 11pt # ok
+        mainfont: Liberation Serif # ok
+        sansfont: Liberation Sans # ok
+        monofont: Source Code Pro # ok
+        linestretch: 1.5 # ok
+# output: 
+#     pdf:
+lang: el # rec
+language: ./_language-el.yml # delete when quarto 1.4 is released :3
+
+bibliography: bibliography.bib
+biblio-style: ieee
+biblatexoptions: sorting=none
+
+############
+# eisvogel #
+############
+#
+# code-block-font-size: \footnotesize
+# table-use-row-colors: true
+# titlepage: true
+# titlepage-rule-color: 123c64 # #123c64
+# titlepage-rule-height: 10
+# caption-justification: centering
+# toc-own-page: false
+

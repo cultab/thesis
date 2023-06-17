@@ -17,9 +17,8 @@ title: "Parallel Classification using Support Vector Machines on Modern GPUs"
 author: Ευάγγελος Κατσανδρής (cs171014@uniwa.gr)
 subtitle: |
     | Πανεπιστήμιο Δυτικής Αττικής
-    | Τμήμα Μηχανικών Πληροφορικής και Υπολογιστών
     | \includegraphics{./img/logo.jpg}
-    | Υπότιτλος
+    | Τμήμα Μηχανικών Πληροφορικής και Υπολογιστών
 date: now
 date-format: dddd MMMM D, YYYY
 
@@ -48,8 +47,8 @@ format:
         linestretch: 1.5 # ok
 # output: 
 #     pdf:
-lang: el # rec
-language: ./_language-el.yml # delete when quarto 1.4 is released :3
+lang: en # rec
+# language: ./_language-el.yml # delete when quarto 1.4 is released :3
 
 bibliography: bibliography.bib
 biblio-style: ieee

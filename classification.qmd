@@ -1,0 +1,67 @@
+
+# Classification
+
+Classification is the process of assigning a class label to each sample of a dataset, an algorithm that classifies data is called a Classifier. It has a wide range of applications ranging from medical diagnosis [@medical] to natural language processing [@text] and building recognition [@alex] to financial fraud detection [@fraud]. As such lots of research has gone into improving classification accuracy (as well as minimizing run time)(?). This section will cover the training of classifiers, types of classifiers depending on the number of classes and finally various types of classifiers used today.
+
+## Learning Strategies(?)
+
+Classification is usually(?) split into two distinct phases, the training phase: wherein the classifier learns how to classify samples, and the prediction phase: wherein the classifier actually attempts to classify a dataset. But depending on when the training phase happens there exist multiple training strategies.
+
+### Batch Learning {#sec:batch}
+
+In batch training, the training and prediction phases **are** distinct and the training happens all at once--- before the prediction stage.
+
+#### Training Phase
+
+The first phase is the training phase wherein the classifier will be given a dataset that is representative of the data it's meant to later classify.
+
+##### Supervised learning
+
+The datasets used in training are usually annotated with the class label of each data point.
+In supervised learning [@supervised], the dataset used in training will be annotated with the class label of each sample. In this way the classifier can learn to extract sets of features that are representative of each class by summarizing(?) the common features of samples with the same class label.
+
+##### Unsupervised learning
+
+Techniques that can operate on unlabeled datasets exist and fall under the label of unsupervised learning [@unsupervised].
+In unsupervised learning, the dataset used in training is not annotated. Unsupervised learning techniques are used when a training dataset does not exist or is prohibitively expensive, time consuming or inconvenient to annotate correctly [@annotation].
+
+#### Prediction Phase
+
+The prediction phase is what happens after successful training of a classifier. The classifier is given a number of samples and assigns each a class label or a probability for each class label.
+
+### Online learning
+
+With online learning, as opposed to \nameref{sec:batch}, the classifier is designed to learn on $\ell + 1$ samples, where $\ell$ is the number of samples already having been used for training. Online learning can be used in conjunction with either unsupervised and supervised learning. Online learning is useful when the training data is prohibitively large [@online], is generated in real time [@online-realtime] or when training has to be interleaved with prediction.
+
+## Binary and Multiclass
+
+Depending on the number of classes in a dataset there exist two kinds of classification. Binary classification is when the number of classes is exactly two and multiclass classification is for more than two classes. Not all kinds of classifiers do inherently support multiclass classification, but one can implement multiclass classifiers by using multiple binary classifiers. There are two main methods of extending binary classifiers to be used in multiclass classification.
+
+### One vs All
+
+One vs All^[One vs All: Also known as One vs Rest (OVR), One Against All (OAA) or One Against Rest (OAR)] (OVA) [@ova-ovo] multiclass classifiers have a classifier for each class. For $n$ classes, $n$ binary classifiers are required, one for each class. Each binary classifier distinguishes whether a sample belongs to a specific class or not (or any of the rest)(?). To assign the final class label to the sample the class label with the highest prediction confidence is used.
+
+### One vs One
+
+One vs One^[One vs one: Also known as One Against One (OAO)] (OVO) [@ova-ovo] multiclass classifiers have a classifier for every 2-combination^[2-combination: a distinct selection of 2 elements from a set] of classes, for $n$ classes $n \choose 2$ binary classifiers are required. 
+
+\begin{equation}
+\binom{n}{2} = \frac{n (n - 2 + 1)}{2 (2 - 1) 1} = \frac{n(n-1)}{2}
+\end{equation}
+
+Each binary classifier labels whether a sample belongs to one of it's two classes classes. The final class label is assigned to a sample using the class label predicted by the majority of the binary classifiers.
+
+## Classifiers
+
+### Perceptron
+
+### Neural Networks
+
+### K-Nearest Neighbor
+
+### Naive Bayes
+
+### SVM
+
+## Linearly and Non-Linearly Separable Data (?)
+

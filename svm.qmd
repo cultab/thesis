@@ -1,0 +1,7 @@
+# Improvements of SVM
+
+## Sequential Minimization Optimization
+
+## Cascade SVM
+
+## Extreme Cascade Machines

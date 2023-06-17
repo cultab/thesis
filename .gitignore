@@ -1,4 +1,7 @@
 
-
-
 /.quarto/
+
+*.log
+
+Thesis.tex
+Thesis.pdf

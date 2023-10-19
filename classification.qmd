@@ -1,7 +1,7 @@
 
 # Classification
 
-Classification is the process of assigning a class label to each sample of a dataset, an algorithm that classifies data is called a Classifier. It has a wide range of applications ranging from medical diagnosis [@medical] to natural language processing [@text] and building recognition [@alex] to financial fraud detection [@fraud]. As such lots of research has gone into improving classification accuracy (as well as minimizing run time)(?). This section will cover the training of classifiers, types of classifiers depending on the number of classes and finally various types of classifiers used today.
+Classification is the process of assigning a class label to each sample of a dataset, an algorithm that classifies data is called a Classifier. It has a wide range of applications ranging from medical diagnosis [@medical] to natural language processing [@text] and building recognition [@alex] to financial fraud detection [@fraud]. As such lots of research has gone into improving classification accuracy (as well as minimizing run time)(?). This section will cover the training of classifiers, various categories of classifiers and finally various types of classifiers used today.
 
 ## Learning Strategies(?)
 
@@ -31,9 +31,9 @@ The prediction phase is what happens after successful training of a classifier. 
 
 ### Online learning
 
-With online learning, as opposed to \nameref{sec:batch}, the classifier is designed to learn on $\ell + 1$ samples, where $\ell$ is the number of samples already having been used for training. Online learning can be used in conjunction with either unsupervised and supervised learning. Online learning is useful when the training data is prohibitively large [@online], is generated in real time [@online-realtime] or when training has to be interleaved with prediction.
+With online learning, as opposed to \nameref{sec:batch}, the classifier is designed to learn on $\ell + 1$ samples, where $\ell$ is the number of samples already having been used for training. In other words the classifier is given an unlabeled sample, it makes a prediction, and then the classifier is given the correct label which it uses to update it's model [@online-slides, page 20]. Online learning can be used in conjunction with either unsupervised and supervised learning. Online learning is useful when the training data is prohibitively large [@online], is generated in real time [@online-realtime] or when training has to be interleaved with prediction.
 
-## Binary and Multiclass
+## Binary and Multiclass {#sec:bmclass}
 
 Depending on the number of classes in a dataset there exist two kinds of classification. Binary classification is when the number of classes is exactly two and multiclass classification is for more than two classes. Not all kinds of classifiers do inherently support multiclass classification, but one can implement multiclass classifiers by using multiple binary classifiers. There are two main methods of extending binary classifiers to be used in multiclass classification.
 
@@ -51,17 +51,83 @@ One vs One^[One vs one: Also known as One Against One (OAO)] (OVO) [@ova-ovo] mu
 
 Each binary classifier labels whether a sample belongs to one of it's two classes classes. The final class label is assigned to a sample using the class label predicted by the majority of the binary classifiers.
 
+## Linear Classifiers {#sec:linear}
+
+A linear classifier is a classifier that can only correctly predict the class of all it's inputs correctly if the dataset is linearly separable.
+For a dataset to be linearly separable there must exist at least one hyperplane^[a subset with dimension $n-1$ where $n$ is the dimension of the dataset] that can create two half-spaces where each one only contains one class of samples(?).
+
+more abstractly a set $X$ with distinct subsets $X_0$ and $X_1$ is said to be linearly separable if there exist $n+1$, $w_1, w_2, \unicodeellipsis, w_n, k$ where $w_i, k \in \BbbR$ satisfying
+
+\begin{align}
+\sum^{n}_{i=1} w_i x_i > k & \\
+\sum^{n}_{i=1} w_i x_i < k &
+\end{align}
+
+where $x_i$ is the $i\textrm{-th}$ element of $X_0$ and $X_1$ respectively.
+
+Non linear classifiers do not have this limitation.
+
 ## Classifiers
+
+This subsection will go over a number of classifiers, as well as (their way of operation)(?). It will also go over the basics of SVM, but more details will be given in \nameref{sec:SVM}
 
 ### Perceptron
 
+The perceptron is a binary linear classifier used in supervised learning <!-- TODO: reference -->. 
+It's a simplified model of brain neurons. It works by evaluating a function $f(x)$:
+
+\begin{equation}
+f(x) = 
+\begin{cases}
+1, & \sum\limits_{i=0}^{n} w_i \cdot x_i  + b > 0 \\
+0, & \text{otherwise}
+\end{cases}
+\end{equation}
+
+where $w$ is a vector of $n$ real valued weights $w_0, w_1, \unicodeellipsis x_n$
+
+x is a vector of $n$ real valued samples $x_0, x_1, \unicodeellipsis x_n$
+
+$n$ is the number of inputs to the perceptron,
+
+and $b$ is a bias term used to shift the activation boundary away from the origin.
+
+#### Training
+
+#### Applications
+
 ### Neural Networks
+
+Neural networks can be simply thought of as a network of perceptrons [@neural-networks]. Many variants exist such as Deep Neural Networks [@deep-learning] for more complex classification problems and Convolutional Neural Networks [@cnn] for classification of images.
+
+#### Training ?
+
+#### Applications
 
 ### K-Nearest Neighbor
 
+
+how
+
+#### Training
+
+#### Applications
+
 ### Naive Bayes
+
+Naive Bayes is a classifier based on the Bayes Theorem \ref{eq:bt} and the "naive" assumption that the features of the classes are independent.
+
+\begin{equation}
+\label{eq:bt}
+P(A|B) = \frac{P(B|A)P(A)}{P(B)}
+\end{equation}
+
+#### Applications
 
 ### SVM
 
-## Linearly and Non-Linearly Separable Data (?)
+Support Vector Machines is a linear binary classifier that works by attempting to find the hyperplane separating two classes.
 
+#### Kernel Trick
+
+As a linear classifier, a linearly separable dataset is usually required \ref{sec:linear}. If instead(?instead of what) a

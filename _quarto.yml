@@ -2,17 +2,6 @@ project:
   render:
     - Thesis.qmd
 
-# book:
-#   chapters:
-    # - titlepage.qmd
-    # - copyright.qmd
-    # - thanks.qmd
-    # - abstract.qmd
-    # - tables_of_contents.qmd
-    # - index.qmd # keywords :P
-    # - intro.qmd
-    # - classification.qmd
-
 title: "Parallel Classification using Support Vector Machines on Modern GPUs"
 author: Ευάγγελος Κατσανδρής (cs171014@uniwa.gr)
 subtitle: |
@@ -53,6 +42,8 @@ lang: en # rec
 bibliography: bibliography.bib
 biblio-style: ieee
 biblatexoptions: sorting=none
+
+# latex-auto-mk: false
 
 ############
 # eisvogel #

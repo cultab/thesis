@@ -1,263 +1,400 @@
 #include <assert.h>
+#include <float.h>
 #include <math.h>
 #include <stdbool.h>
 #include <stddef.h>
 #include <stdio.h>
 #include <stdlib.h>
 
-#define matrix_index(_index_mat, _index_row, _index_col) _index_mat.data[_index_mat.cols * _index_row + _index_col]
-#define vector_index(_index_vec, _index) _index_vec.data[_index]
+#define EPOCHS 1000
+
+// #define matrix_index(_index_mat, _index_row, _index_col) _index_mat.data[_index_mat.cols * _index_row + _index_col]
+#define vector_index(_index_vec, _index) _index_vec.col[_index]
+
+const int PRINT_AFTER  = 100;
+const int PRINT_DIGITS = 1 + PRINT_AFTER + 2;
 
 typedef double_t f64;
 
-typedef struct matrix {
+typedef struct vector {
     size_t cols;
-    size_t rows;
-    f64   *data;
+    f64   *col;
+} vector;
+
+typedef struct matrix {
+    size_t  rows;
+    size_t  cols;
+    vector *row;
 } matrix;
 
 // clang-format off
-matrix matrix_new(size_t rows, size_t cols)
+vector vector_new(size_t cols)
 {
-    return (matrix) {
-        .rows = rows,
+    return (vector) {
         .cols = cols,
-        .data = malloc(rows * cols * sizeof(f64))
+        .col = malloc(cols * sizeof(f64))
     };
 }
 
-matrix matrix_new_like(matrix m)
+vector vector_new_like(vector v)
 {
-    return (matrix) {
-        .rows = m.rows,
-        .cols = m.cols,
-        .data = malloc(m.cols * m.rows * sizeof(f64))
+    return (vector) {
+        .cols = v.cols,
+        .col = malloc(v.cols * sizeof(f64))
     };
 }
 // clang-format on
 
-matrix matrix_zero(matrix m)
+vector vector_zero(vector v)
 {
-    for (size_t i = 0; i < m.cols * m.rows; i++) {
-        m.data[i] = 0.0;
+    for (size_t i = 0; i < v.cols; i++) {
+        v.col[i] = 0.0;
     }
-    return m;
+    return v;
 }
 
-matrix matrix_mult_elementwise(matrix m, matrix w)
+// vector vector_mult_elementwise(vector m, vector w)
+// {
+//     assert(m.rows == w.rows && m.cols == w.rows);
+//     vector res = vector_new_like(m);
+//     for (size_t i = 0; i < m.cols * m.rows; i++) {
+//         res.data[i] = m.data[i] * w.data[i];
+//     }
+//     return res;
+// }
+
+// vector vector_mult_scalar(vector v, f64 scalar)
+// {
+//     vector res = vector_new_like(v);
+//     for (size_t i = 0; i < v.cols; i++) {
+//         res.col[i] = v.col[i] * scalar;
+//     }
+//     return res;
+// }
+
+vector vector_mult_scalar(vector v, size_t i, f64 scalar)
 {
-    assert(m.rows == w.rows && m.cols == w.rows);
-    matrix res = matrix_new_like(m);
-    for (size_t i = 0; i < m.cols * m.rows; i++) {
-        res.data[i] = m.data[i] * w.data[i];
+    vector res = vector_new_like(v);
+    for (size_t j = 0; j < v.cols; j++) {
+        vector_index(res, j) = v.col[j] * scalar;
     }
     return res;
 }
 
-matrix matrix_mult(matrix m, matrix n, matrix r)
-{
-    assert(m.cols == n.rows);
-    for (size_t i = 0; i < m.rows; i++) {
-        for (size_t j = 0; j < n.cols; j++) {
-            f64 temp_sum = 0;
-            for (size_t k = 0; k < m.cols; k++) {
-                temp_sum += matrix_index(m, i, k) * matrix_index(n, k, j);
-            }
-            matrix_index(r, i, j) = temp_sum;
-        }
-    }
-    return r;
-}
+// vector vector_mult(vector m, vector n, vector r)
+// {
+//     assert(m.cols == n.rows);
+//     for (size_t i = 0; i < m.rows; i++) {
+//         for (size_t j = 0; j < n.cols; j++) {
+//             f64 temp_sum = 0;
+//             for (size_t k = 0; k < m.cols; k++) {
+//                 temp_sum += vector_index(m, i, k) * vector_index(n, k, j);
+//             }
+//             vector_index(r, i, j) = temp_sum;
+//         }
+//     }
+//     return r;
+// }
 
-matrix matrix_transpose(matrix m)
-{
-    if (m.cols == 1 || m.rows == 1) {
+// vector vector_transpose(vector m)
+// {
+//     if (m.cols == 1 || m.rows == 1) {
+//
+//         size_t temp = m.cols;
+//         m.cols      = m.rows;
+//         m.rows      = temp;
+//
+//         return m;
+//     } else {
+//         assert("vector transpose not implemented for n!=m");
+//         return (vector) {};
+//     }
+// }
 
-        size_t temp = m.cols;
-        m.cols      = m.rows;
-        m.rows      = temp;
+#define vector_print(vec)                                                                                              \
+    do {                                                                                                               \
+        _vector_print(vec, #vec);                                                                                      \
+    } while (0)
 
-        return m;
-    } else {
-        assert("Matrix transpose not implemented for n!=m");
-        return (matrix) {};
-    }
-}
-
-void matrix_print(matrix m, const char *msg)
+void _vector_print(vector v, const char *msg)
 {
     puts(msg);
-    for (size_t i = 0; i < m.rows; i++) {
-        for (size_t j = 0; j < m.cols; j++) {
-            printf("%6.2lf ", matrix_index(m, i, j));
-        }
-        puts("");
+    for (size_t j = 0; j < v.cols; j++) {
+        printf("%*.*lf ", PRINT_DIGITS, PRINT_AFTER, vector_index(v, j));
     }
     puts("");
 }
 
-f64 Kernel(matrix x, size_t a, size_t b)
+#define printd(var)                                                                                                    \
+    do {                                                                                                               \
+        _printd(#var " :\t%*.*lf\n", var);                                                                             \
+    } while (0)
+
+void _printd(const char *fmt, f64 var) { printf(fmt, PRINT_DIGITS, PRINT_AFTER, var); }
+
+f64 Linear_Kernel(vector a, vector b)
 {
-    f64  dot = 0;
-    f64 *x_i = x.data + a * x.cols;
-    f64 *x_j = x.data + b * x.cols;
-    for (size_t k = 0; k < x.cols; k++) {
-        dot += x_i[k] * x_j[k];
+    f64 res = 0;
+    for (size_t k = 0; k < a.cols; k++) {
+        res += a.col[k] * b.col[k];
     }
-    return dot;
+    return res;
 }
+
+f64 eval_poly(f64 x, f64 a, f64 b, f64 c)
+{
+    //
+    // printf("\t%f*%f^2 + %f*%f + %f = %f\n", a, x, b, x, c, a * pow(x, 2) + b * x + c);
+    return a * pow(x, 2) + b * x + c;
+}
+
+#define max(a, b) a > b ? a : b
+#define min(a, b) a < b ? a : b
 
 int main(int argc, char *argv[])
 {
-    // // clang-format off
-    // matrix one = (matrix)
-    // {
-    //     .rows = 1, .cols = 3, .data = (f64[]) { 1, 2, 3 }
-    // };
-    // matrix two = (matrix)
-    // {
-    //     .rows = 3, .cols = 4, .data = (f64[]) { 1, 2, 3, 4, 5, 6, 7, 8, 9, 10, 11, 12 }
-    // };
-    // // clang-format on
-    // matrix res = matrix_new_like(one);
-    // matrix_print(one, "one");
-    // matrix_print(two, "two");
-    // res = matrix_mult(one, two, res);
-    // matrix_print(res, "res");
 
     // clang-format off
     matrix x = (matrix) {
-        .rows = 3,
-        .cols = 5,
-        .data = (f64[]) {
-              1,   1,   2,   3,   8,
-             10,  10,  20,   9,  15,
-            100, 115, 200, 130, 128,
+        .rows = 10,
+        .cols = 2,
+        .row = (vector[]) {
+            {.cols = 2, .col = (f64[]) {1, 1}},
+            {.cols = 2, .col = (f64[]) {2, 1}},
+            {.cols = 2, .col = (f64[]) {4, 1}},
+            {.cols = 2, .col = (f64[]) {8, 1}},
+            {.cols = 2, .col = (f64[]) {9, 1}},
+            {.cols = 2, .col = (f64[]) {-1, -1}},
+            {.cols = 2, .col = (f64[]) {-2, -1}},
+            {.cols = 2, .col = (f64[]) {-4, -1}},
+            {.cols = 2, .col = (f64[]) {-8, -1}},
+            {.cols = 2, .col = (f64[]) {-9, -1}},
         }
     };
-    matrix y = (matrix) {
-        .rows = 3,
-        .cols = 1,
-        .data = (f64[]) {
-            -1,
+    vector y = (vector) {
+        .cols = 10,
+        .col = (f64[]) {
              1,
-             1
+             1,
+             1,
+             1,
+             1,
+            -1,
+            -1,
+            -1,
+            -1,
+            -1,
         }
     };
-    matrix alpha = (matrix) {
-        .rows = 1,
-        .cols = 3,
-        .data = (f64[]) {
-            0, 0, 0
-        }
+    vector alpha = (vector) {
+        .cols = 10,
+        .col = (f64[]) { 0, 0, 0, 0, 0, 0, 0, 0, 0, 0 }
     };
-    // clang-format on
 
+    vector w = (vector) {
+        .cols = 2,
+        .col = (f64[]) {
+            1, 1
+        }
+    };
+
+    f64 b = 0;
+    // clang-format on
     int epoch = 0;
 
-    while (epoch < 100) {
-        int s = 1;
-        int r = 0;
-        f64 alpha_r;
-        f64 alpha_s;
-        // f64 rho;
-        f64 zeta;
-        f64 coef_a = 0;
-        f64 coef_b = 0;
-        f64 coef_c = 0;
+    while (epoch < EPOCHS) {
+        int i_1 = rand() % alpha.cols; // epoch % alpha.cols;
+        int i_2 = 0; //(epoch + 1) % alpha.cols;
+        do {
+            i_2 = rand() % alpha.cols;
+        } while (i_2 == i_1);
+        f64 COST = 3.0L;
 
-        printf("%5.2lf", coef_a);
-        printf("%5.2lf", coef_b);
-        printf("%5.2lf", coef_c);
-
-        // find zeta where z = - Σi∉{r,s} a_i*y_i
-        for (size_t i = 0; i < alpha.cols; i++) {
-            if (i == r || i == s) { // skip a_s and a_r
-                continue;
-            }
-            zeta += alpha.data[i] * y.data[i];
-        }
-
-        alpha_r = alpha.data[r];
-        alpha_s = zeta - alpha_r * y.data[r];
-
-        for (size_t i = 0; i < alpha.cols; i++) {
-            if (i == s) { // replace a_s with y_s^-1(z - a_r*y_r)
-                coef_b += alpha_s;
-            } else if (i == r) {
-                coef_a += 1;
-            } else {
-                coef_b += alpha.data[i];
+        if (epoch > 0) {
+            char c = getchar();
+            if (c == 'q') {
+                break;
             }
         }
+        puts("==============");
+        printf("EPOCH %d\n", epoch);
+        epoch++;
+        printd(i_1);
+        printd(i_2);
+        vector_print(y);
 
-        for (size_t i = 0; i < alpha.cols; i++) {
+        f64 s = y.col[i_1] * y.col[i_2];
+        f64 L = 0, H = 0;
+
+        // find low and high
+        if (y.col[i_1] != y.col[i_2]) {
+            L = max(0, alpha.col[i_2] - alpha.col[i_2]);
+            H = min(COST, COST + alpha.col[i_2] - alpha.col[i_2]);
+        } else {
+            L = max(0, alpha.col[i_2] + alpha.col[i_2] - COST);
+            H = min(COST, alpha.col[i_2] - alpha.col[i_2]);
+        }
+        printd(L);
+        printd(H);
+
+        // second derivative (f'')
+        f64 fpp = 2 * Linear_Kernel(x.row[i_1], x.row[i_2]) - Linear_Kernel(x.row[i_1], x.row[i_1])
+            - Linear_Kernel(x.row[i_2], x.row[i_2]);
+        printd(fpp);
+        if (fpp > 0) {
+            puts("fpp is NOT negative!");
+        }
+
+        f64 a_1 = 0, a_2 = 0;
+        if (fabs(fpp) < 0.00001) {
+            puts("fpp is zero!");
+            // NOTE: see eq 12.21 again for = f^{old}(x_i) ...
+            f64 v_1 = 0;
             for (size_t j = 0; j < alpha.cols; j++) {
-                if (i == r) { // coeficient of a_r -> b or a_r^2 -> a
-                    if (j == r) { // coeficient of a_r^2 -> a
-                        coef_a += y.data[i] * y.data[j] * Kernel(x, i, j);
-                    } else { // coeficient of a_r -> b
-                        if (j == s) {
-                            coef_b += alpha_s * y.data[i] * y.data[j] * Kernel(x, i, j);
-                        } else {
-                            coef_b += alpha.data[j] * y.data[i] * y.data[j] * Kernel(x, i, j);
-                        }
-                    }
-                } else { // coeficient of a_r^0 -> c
-                    coef_c += alpha.data[i] * alpha.data[j] * y.data[i] * y.data[j] * Kernel(x, i, j);
+                if (j == i_1 || j == i_2) {
+                    continue;
                 }
+                v_1 += y.col[j] * alpha.col[j] * Linear_Kernel(x.row[i_1], x.row[j]);
+            }
+            f64 v_2 = 0;
+            for (size_t j = 0; j < alpha.cols; j++) {
+                if (j == i_1 || j == i_2) {
+                    continue;
+                }
+                v_2 += y.col[j] * alpha.col[j] * Linear_Kernel(x.row[i_2], x.row[j]);
+            }
+            f64 Wconst = 0;
+            for (size_t i = 0; i < alpha.cols; i++) {
+                if (i == i_1 || i == i_2) {
+                    continue;
+                }
+                Wconst += alpha.col[i];
+                f64 inner_sum = 0;
+                for (size_t j = 0; j < alpha.cols; j++) {
+                    if (j == i_1 || j == i_2) {
+                        continue;
+                    }
+                    inner_sum += y.col[i] * y.col[j] * Linear_Kernel(x.row[i], x.row[j]) * alpha.col[i] * alpha.col[j];
+                }
+                Wconst -= inner_sum / 2;
             }
 
+            f64 gamma = alpha.col[i_1] + (s * alpha.col[i_2]);
+            f64 WL    = gamma - s * L + L - (Linear_Kernel(x.row[i_1], x.row[i_1]) * (gamma - s * L)) / 2
+                + (Linear_Kernel(x.row[i_2], x.row[i_2]) * (gamma - s * L) * L) / 2 - y.col[i_1] * (gamma - s * L) * v_1
+                + -y.col[i_2] * L * v_2 + Wconst;
+            f64 WH = gamma - s * H + H - (Linear_Kernel(x.row[i_1], x.row[i_1]) * (gamma - s * H)) / 2
+                + (Linear_Kernel(x.row[i_2], x.row[i_2]) * (gamma - s * H) * H) / 2 - y.col[i_1] * (gamma - s * H) * v_1
+                + -y.col[i_2] * H * v_2 + Wconst;
+            printd(WL);
+            printd(WH);
+
+            if (WL > WH) {
+                a_2 = L;
+            } else {
+                a_2 = H;
+            }
+
+        } else { // if fpp is negative
+            puts("else");
+
+            // error on training examples i_1 and i_2
+            f64 E1 = 0, E2 = 0;
+            for (size_t j = 0; j < x.cols; j++) {
+                E1 += w.col[j] * x.row[i_1].col[j] + b;
+            }
+            for (size_t j = 0; j < x.cols; j++) {
+                E2 += w.col[j] * x.row[i_2].col[j] + b;
+            }
+            printd(E1);
+            printd(E2);
+
+            // new a_2
+            a_2 = alpha.col[i_2] - (y.col[i_2] * (E1 - E2)) / fpp;
+            printd(a_2);
+
+            // clip a_2
+            if (a_2 > H) {
+                a_2 = H;
+            } else if (a_2 < L) {
+                a_2 = L;
+            }
+            printd(a_2);
+        }
+        a_1 = alpha.col[i_1] + s * (alpha.col[i_2] - a_2);
+        printd(a_1);
+
+        alpha.col[i_1] = a_1;
+        alpha.col[i_2] = a_2;
+
+        // check for some KKT conditions
+        f64 a_y_is_zero = 0;
+        for (size_t i = 0; i < alpha.cols; i++) {
+            a_y_is_zero += alpha.col[i] * y.col[i];
+        }
+        f64 a_is_pos = 0;
+        for (size_t i = 0; i < alpha.cols; i++) {
+            a_is_pos += alpha.col[i] >= 0 ? 0 : 1;
+        }
+        printd(a_y_is_zero == 0);
+        printd(a_is_pos == 0);
+
+        // TODO: Compute w and use it to check for a_i to be optimized next
+        for (size_t k = 0; k < w.cols; k++) {
+            w.col[k] = 0;
         }
 
-        // TODO: now find L and H and where y at f'(x) = 0
+        for (size_t i = 0; i < alpha.cols; i++) {
+            for (size_t k = 0; k < w.cols; k++) {
+                w.col[k] += alpha.col[i] * y.col[i] * x.row[i].col[k];
+            }
+        }
+        vector_print(alpha);
+        vector_print(w);
 
-        //
-        // for (size_t i = 0; i < alpha.cols; i++) {
-        //     for (size_t j = 0; j < alpha.cols; j++) { }
-        //
-        //     // replace x[i] with kernel(x[i])
-        //
-        //     // f64 z = sum alpha[i] * y[i] for i not in {r,s}
-        //     // look for a_s where:
-        //     // f64 a_s = (z - alpha[r] * y[r]) / y[s]
-        //
-        //     // choose r at random for now ?
-        //
-        //     // chose alpha[r] to maximise a*alpha[r]^2+b*alpha[r] + c
-        //     // s.t.
-        //     // if y[r] == y[s] max(0, -y[r]*C-z) <= alpha[r] <= min(C, y[r]*z)
-        //     // if y[r] != y[s] max(0, y[r]*z) <= alpha[r] <= min(C, -y[r]*C-z)
-        //     //
-        //     // where a b c are the fixed alpha[i]s'?
-        //     // alpha[r] = -b/2a or
-        //     //
-        //     // a = (sum all alpha[i] but alpha[r])
-        //     // b = sum all alpha[i]
-        //     // c =
-        //     // sum all alpha[i]
-        //     // - 1/2
-        //     // ar*ar    a1*ar ar*a1 a1*ar
-        //     //        ar*(a1+a1+a1)
-        //     //
-        //     // a = 1 ?
-        //     // b = 2 * [ (sum alpha[i]) - alpha[r] ] + 1
-        //     // c = sum alpha[i]*alpha[j] skipping alpha[r] ?
-        //
-        //     // C = rho[i] + alpha[i] (choose rho so that alpha[i] <= C)
-        //     // so
-        //     // 0 < alpha[i] < C
-        //
-        //     // alpha[i] != 0 for support vectors
-        //     // w is linear combination of support vectors
-        //
-        //     // w = sum alpha[i]y[i]x[i]
-        //     // b = -1/2 (min      sum    a_j*y_j*K(xi,xj) + max but for i:y_i=-1)
-        //     //           i:y_i=1  a_j!=0       i:y_i=-1
-        //
-        //     // predict by sign(w^T*x+b)
-        //     // or sign(sum ai yi K(xi, x) +b)
-        //     //         ai!=0
-        //     return 0;
+        f64 min_p = DBL_MAX;
+        for (size_t i = 0; i < x.rows; i++) {
+            f64 temp = 0;
+            for (size_t k = 0; k < w.cols; k++) {
+                if (y.col[i] != 1) { // if not positive class skip
+                    continue;
+                }
+                temp += w.col[k] * x.row[i].col[k];
+            }
+            if (temp < min_p) {
+                min_p = temp;
+            }
+        }
+        f64 max_n = -DBL_MAX;
+        for (size_t i = 0; i < x.rows; i++) {
+            f64 temp = 0;
+            for (size_t k = 0; k < w.cols; k++) {
+                if (y.col[i] != -1) { // if not negative class skip
+                    continue;
+                }
+                temp += w.col[k] * x.row[i].col[k];
+            }
+            if (temp > max_n) {
+                max_n = temp;
+            }
+        }
+        b = -(min_p + max_n) / 2;
+        printd(b);
+    }
+
+    vector example = (vector) { .cols = 2, .col = (f64[]) { 1,  1 } };
+    f64    res     = 0;
+    for (int i = 0; i < example.cols; i++) {
+        printd(w.col[i]);
+        printd(example.col[i]);
+        f64 temp_res = w.col[i] * example.col[i] + b;
+        printd(temp_res);
+        res += temp_res;
+    }
+    printd(res);
+    if (res < 0) {
+        puts("class -1");
+    } else {
+        puts("class  1");
     }
 }

@@ -1,3 +1,3 @@
 
 all:
-	cc svm.c -o svm
+	cc svm.c -o svm -lm

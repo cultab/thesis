@@ -5,4 +5,6 @@ Language: Cpp
 ColumnLimit: 120
 AlignAfterOpenBracket: Align
 PackConstructorInitializers: CurrentLine
-# AllowShortFunctionsOnASingleLine: Empty
+AllowShortFunctionsOnASingleLine: Empty
+ReferenceAlignment: Left
+PointerAlignment: Left

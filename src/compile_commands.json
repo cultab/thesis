@@ -1,0 +1,12 @@
+[
+  {
+    "arguments": [
+      "/usr/bin/g++",
+      "-c",
+      "--std=c++2b",
+      "./test.cpp"
+    ],
+    "directory": "/home/evan/repos/thesis/src",
+    "file": "/home/evan/repos/thesis/src/test.cpp"
+  }
+]

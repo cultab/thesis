@@ -3,50 +3,78 @@
 
 #include "types.hpp"
 
-#include <iostream>
-#include <istream>
 #include <map>
+#include <vector>
+#include <string>
 
-using std::string;
-using std::stringstream;
-using std::cout, std::endl;
+using std::fscanf;
+using std::printf;
+using types::size;
 
-template <typename number> class dataset {
-    using vector = types::vector<number>;
+inline std::vector<std::string> split(const char *str, const char *delim) {
+    std::vector<std::string> ret;
+    char *buf = new char[255];
+    size i = 0;
+    size buf_len = 0;
+    char c;
+    do {
+        c = str[i++];
+        if (c == *delim || c == '\0') {
+            buf_len = 0;
+            ret.push_back(buf);
+            // printf("push_back: '%s'\n", buf);
+        } else {
+            buf[buf_len++] = c;
+        }
+
+    } while (c != '\0');
+    return ret;
+}
+
+template <typename number, typename integer = int>
+    // requires std::floating_point<number> && std::integral<integer>
+class dataset {
+
+    using vector = types::vector<integer>;
     using matrix = types::matrix<number>;
 
   public:
     matrix X;
     vector Y;
 
-    dataset(std::size_t num_features, std::size_t num_samples, std::istream &input)
+    dataset(size num_features, size num_samples, std::FILE *input)
         : Y(vector(num_samples)),
           X(matrix(num_samples, num_features)) {
 
-        std::map<string, number> classes;
-        int class_id = 0;
+        this->Y.set(0);
+        std::map<std::string, integer> classes;
+        integer class_id = 0;
 
-        for (std::size_t i; i < num_samples; i++) {
-            auto sample = X[i];
-            for (std::size_t j; j < num_features; j++) {
-                // TODO: use sane file reading
-                input >> a;
-                sample.set(j, a);
+        char *buf = new char[50];
+
+        for (size i = 0; i < num_samples; i++) {
+            fscanf(input, "%s", buf);
+            auto values = split(buf, ",");
+            size j;
+            for (j = 0; j < num_features; j++) {
+                std::sscanf(values[j].c_str(), "%f", &X[i][j]); // double free or corruption (!prev)
             }
-            string class_name;
-            input >> class_name;
+            std::string class_name = values[j];
             if (classes.find(class_name) == classes.end()) {
                 classes[class_name] = class_id++;
             }
-            Y.set(i, classes[class_name]);
+            Y[i] =  classes[class_name];
         }
+        delete[] buf;
+    }
+    ~dataset() {
     }
     void printX() {
-        for (vector x : X) {
-            for (auto v : x) {
-                cout << v;
+        for (size i = 0; i < X.rows; i++) {
+            for (size j = 0; j < X.cols; j++) {
+                std::printf("%5.3f ", X[i][j]);
             }
-            cout << endl;
+            std::printf("class=%d\n", Y[i]);
         }
     }
 };

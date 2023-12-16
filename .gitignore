@@ -2,6 +2,9 @@
 /.quarto/
 
 *.log
+a.out
+datasets
+.cache
 
 Thesis.tex
 Thesis.pdf

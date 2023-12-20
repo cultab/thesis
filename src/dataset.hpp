@@ -4,16 +4,16 @@
 #include "types.hpp"
 
 #include <map>
-#include <vector>
 #include <string>
+#include <vector>
 
 using std::fscanf;
 using std::printf;
 using types::size;
 
-inline std::vector<std::string> split(const char *str, const char *delim) {
+inline std::vector<std::string> split(const char* str, const char* delim) {
     std::vector<std::string> ret;
-    char *buf = new char[255];
+    char* buf = new char[255];
     size i = 0;
     size buf_len = 0;
     char c;
@@ -32,7 +32,7 @@ inline std::vector<std::string> split(const char *str, const char *delim) {
 }
 
 template <typename number, typename integer = int>
-    // requires std::floating_point<number> && std::integral<integer>
+// requires std::floating_point<number> && std::integral<integer>
 class dataset {
 
     using vector = types::vector<integer>;
@@ -42,7 +42,7 @@ class dataset {
     matrix X;
     vector Y;
 
-    dataset(size num_features, size num_samples, std::FILE *input)
+    dataset(size num_features, size num_samples, std::FILE* input)
         : Y(vector(num_samples)),
           X(matrix(num_samples, num_features)) {
 
@@ -50,24 +50,26 @@ class dataset {
         std::map<std::string, integer> classes;
         integer class_id = 0;
 
-        char *buf = new char[50];
+        char* buf = new char[200];
 
         for (size i = 0; i < num_samples; i++) {
             fscanf(input, "%s", buf);
             auto values = split(buf, ",");
             size j;
             for (j = 0; j < num_features; j++) {
-                std::sscanf(values[j].c_str(), "%f", &X[i][j]); // double free or corruption (!prev)
+                // printf("str='%s'\n", values[j].c_str());
+                std::sscanf(values[j].c_str(), "%lf", &X[i][j]); // double free or corruption (!prev)
             }
             std::string class_name = values[j];
             if (classes.find(class_name) == classes.end()) {
                 classes[class_name] = class_id++;
             }
-            Y[i] =  classes[class_name];
+            Y[i] = classes[class_name];
         }
         delete[] buf;
     }
     ~dataset() {
+        printf("Destructor");
     }
     void printX() {
         for (size i = 0; i < X.rows; i++) {

@@ -1,4 +1,5 @@
 #include <algorithm>
+#include <functional>
 #ifndef TYPES_HPP
 #define TYPES_HPP 1
 
@@ -9,7 +10,7 @@ namespace types {
 
 using f64 = double;
 using size = std::size_t;
-const int PRINT_AFTER = 15;
+const int PRINT_AFTER = 25;
 const int PRINT_DIGITS = 1 + PRINT_AFTER + 2;
 
 #define printd(var)                                                                                                    \
@@ -21,70 +22,100 @@ const int PRINT_DIGITS = 1 + PRINT_AFTER + 2;
         types::_vec_print(vec, #vec);                                                                                  \
     } while (0)
 
-const f64 epsilon = 10e-3;
+const f64 epsilon = 1e-3;
 
-template <typename number = f64, bool parallel = false, bool is_view = false> struct vector {
+template <typename number = f64, bool owns_memory = true> struct vector {
     const size_t cols;
     number* data;
 
-    auto get(std::size_t index) {
-        return this->data[index];
+    // auto get(std::size_t index) {
+    //     return this->data[index];
+    // }
+
+    // range constructor
+    vector(number* start, number* end) : cols(end - start) {
+        this->data = start;
     }
+    // sized constructor
+    vector(std::size_t cols) : cols(cols) {
+        this->data = new number[cols];
+    }
+    // move constructor
+    vector(vector&& other) : cols(other.cols) {
+        this->data = std::move(other.data);
+    }
+    // explicit conversion constructor
+    // vector(vector<number, false>&& other) : cols(other.cols) {
+    //     this->data = std::move(other.data);
+    // }
+
+    // move assignment
     vector& operator=(vector&& other) {
         delete[] this->data;
         this->data = other.data;
         this->cols = other.cols;
         return *this;
     }
-    vector& operator=(vector& other) = delete;
-    vector(number* start, number* end) : cols(end - start) {
-        this->data = start;
-    }
-    vector(std::size_t cols) : cols(cols) {
-        this->data = new number[cols];
-    }
-    vector(vector&& other) : cols(other.cols) {
-        this->data = std::move(other.data);
-    }
 
+    // delete copy constructor and assignment
     vector(const vector& other) = delete;
+    vector& operator=(vector& other) = delete;
 
-    void set(number value) {
-        if constexpr (parallel) {
-#pragma omp parallel for
-            for (size i = 0; i < this->cols; i++) {
-                this->data[i] = value;
-            }
-        } else {
-            for (size i = 0; i < this->cols; i++) {
-                this->data[i] = value;
-            }
+    ~vector() {
+        if constexpr (owns_memory) {
+            delete[] this->data;
         }
     }
+
+    // set all elements
+    void set(number value) {
+        /* clang-format off  */
+        #pragma omp parallel for /* clang-format on  */
+        for (size i = 0; i < this->cols; i++) {
+            this->data[i] = value;
+        }
+    }
+
     number& operator[](std::size_t index) {
         return this->data[index];
     }
+
     number* begin() {
         return this->data;
     }
     number* end() {
         return this->data + cols - 1;
     }
-    ~vector() {
-        if constexpr (!is_view) {
-            delete[] this->data;
+
+    // mutate elements
+    void mutate(std::function<number(number)> func) {
+        /* clang-format off  */
+        #pragma omp parallel for /* clang-format on  */
+        for (size i = 0; i < this->cols; i++) {
+            this->data[i] = func(this->data[i]);
         }
     }
 };
 
-template <typename number, bool parallel = false> struct matrix {
+template <typename number> struct matrix {
     const size_t rows;
     const size_t cols;
     number* data;
 
-    auto inline get(std::size_t row, std::size_t col) {
-        return this->data[row * this->cols + col];
+    // auto inline get(std::size_t row, std::size_t col) {
+    //     return this->data[row * this->cols + col];
+    // }
+
+    // sized constructor
+    matrix(std::size_t rows, std::size_t cols) : rows(rows), cols(cols) {
+        this->data = new number[cols * rows];
     }
+    // move constructor
+    matrix(matrix&& other) : rows(other.rows), cols(other.cols) {
+        this->data = std::move(other.data);
+    }
+
+    // move assignment
     matrix& operator=(matrix&& other) {
         delete[] this->data;
         this->data = other.data;
@@ -92,23 +123,23 @@ template <typename number, bool parallel = false> struct matrix {
         this->rows = other.rows;
         return *this;
     }
-    matrix(matrix&& other) : rows(other.rows), cols(other.cols) {
-        this->data = std::move(other.data);
+
+    ~matrix() {
+        delete[] this->data;
     }
-    matrix(std::size_t rows, std::size_t cols) : rows(rows), cols(cols) {
-        this->data = new number[cols * rows];
-    }
+
     number* begin() {
         return this->data;
     }
     number* end() {
         return this->data + rows * cols;
     }
-    vector<number, parallel, true> operator[](std::size_t index) {
-        return vector<number, parallel, true>(&(this->data[index * cols]), &(this->data[index * cols + cols]));
+    // returns a vector which does not deallocate it's data, since it's owned by this matrix
+    vector<number, false> operator[](std::size_t index) {
+        return vector<number, false>(&(this->data[index * cols]), &(this->data[index * cols + cols]));
     }
-    ~matrix() {
-        delete[] this->data;
+    vector<number, false> operator[](std::size_t index) const {
+        return vector<number, false>(&(this->data[index * cols]), &(this->data[index * cols + cols]));
     }
 };
 
@@ -144,6 +175,18 @@ void inline _vec_print(const vector<f64>& v, const char* msg) {
             std::printf("%*.*lf ", PRINT_DIGITS, PRINT_AFTER, v.data[j]);
         }
         std::puts("");
+    }
+}
+
+void inline _vec_print(const matrix<f64>& v, const char* msg) {
+    if constexpr (DEBUG) {
+        std::puts(msg);
+        for (std::size_t i = 0; i < v.rows; i++) {
+            for (std::size_t j = 0; j < v.cols; j++) {
+                std::printf("%*.*f ", PRINT_DIGITS, PRINT_AFTER, v[i][j]);
+            }
+            std::puts("");
+        }
     }
 }
 

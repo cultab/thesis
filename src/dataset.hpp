@@ -28,6 +28,7 @@ inline std::vector<std::string> split(const char* str, const char* delim) {
         }
 
     } while (c != '\0');
+    delete[] buf;
     return ret;
 }
 
@@ -68,8 +69,16 @@ class dataset {
         }
         delete[] buf;
     }
+
     ~dataset() {
-        printf("Destructor");
+        // printf("~dataset\n");
+    }
+
+    vector& getY() {
+        return this->Y;
+    }
+    matrix& getX() {
+        return this->X;
     }
     void printX() {
         for (size i = 0; i < X.rows; i++) {

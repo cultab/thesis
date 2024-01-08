@@ -43,6 +43,7 @@ template <typename number = f64, bool owns_memory = true> struct vector {
     // move constructor
     vector(vector&& other) : cols(other.cols) {
         this->data = std::move(other.data);
+        other.data = nullptr;
     }
     // explicit conversion constructor
     // vector(vector<number, false>&& other) : cols(other.cols) {
@@ -54,6 +55,7 @@ template <typename number = f64, bool owns_memory = true> struct vector {
         delete[] this->data;
         this->data = other.data;
         this->cols = other.cols;
+        other.data = nullptr;
         return *this;
     }
 
@@ -63,6 +65,7 @@ template <typename number = f64, bool owns_memory = true> struct vector {
 
     ~vector() {
         if constexpr (owns_memory) {
+            // printf("~vector: %p\n", this);
             delete[] this->data;
         }
     }
@@ -113,6 +116,7 @@ template <typename number> struct matrix {
     // move constructor
     matrix(matrix&& other) : rows(other.rows), cols(other.cols) {
         this->data = std::move(other.data);
+        other.data = nullptr;
     }
 
     // move assignment
@@ -121,10 +125,12 @@ template <typename number> struct matrix {
         this->data = other.data;
         this->cols = other.cols;
         this->rows = other.rows;
+        other.data = nullptr;
         return *this;
     }
 
     ~matrix() {
+        // printf("~matrix: %p\n", this);
         delete[] this->data;
     }
 

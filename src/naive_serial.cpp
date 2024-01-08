@@ -5,7 +5,7 @@
 #include <cstdlib>
 #include <float.h>
 
-#define EPOCHS 100000
+#define EPOCHS 1000
 // #define EPOCHS 10
 
 using f64 = types::f64;
@@ -35,9 +35,10 @@ int main(int argc, char* argv[]) {
     }
     // only load two classes for now = 100 samples
     dataset<f64> data(4, 100, file);
-    vector<int> y = std::move(data.Y);
+    vector<int> y = std::move(data.getY());
+    // HACK: find way to convert arbitrary Y labels to -1 +1 
     y.mutate([](int a) -> int { return a + 1; });
-    matrix<f64> x = std::move(data.X);
+    matrix<f64> x = std::move(data.getX());
 
     // vec_print(y);
     // vec_print(x);
@@ -252,7 +253,7 @@ int main(int argc, char* argv[]) {
         f64 res = 0;
         puts("==========");
         printf("%d\n", i);
-        vector example = x[i];
+        auto example = x[i];
         // vec_print(example);
         for (int j = 0; j < example.cols; j++) {
             res += w[j] * example[j] + b;
@@ -288,4 +289,13 @@ int main(int argc, char* argv[]) {
     printf("rec %lf\n", recall);
     printf("pre %lf\n", precision);
     printf("f1  %lf\n", f1_score);
+
+    // printf("alpha:   %p\n", &alpha);
+    // printf("w:       %p\n", &w);
+    // printf("indexes: %p\n", &indexes);
+    // printf("x:       %p\n", &x);
+    // printf("y:       %p\n", &y);
+    // printf("d.x:     %p\n", &data.X);
+    // printf("d.y:     %p\n", &data.Y);
+    // printf("example: %p\n", &example);
 }

@@ -1,9 +1,10 @@
-CC = g++
-CFLAGS = -O1 --std=c++17 -DTRACE
+CC = nvcc
+NVCC_COMPILE_ONLY_FLAGS=--device-c
+CFLAGS = -O1 --std=c++17 -arch=sm_61 -forward-unknown-to-host-compiler
 LIBS = -lm
 SRC := naive_serial.cpp
 OBJ := $(SRC:.cpp=.o)
-TARGET := svm
+TARGET := naive_serial
 
 all: $(TARGET)
 
@@ -13,10 +14,12 @@ types.o: types.hpp
 naive_serial.o: dataset.hpp types.hpp
 
 
-# %.o: %.cpp
-# 	$(CC) $(CFLAGS) -c $<
+%.o: %.cpp
+	$(CC) $(CFLAGS) -c $<
 
-$(TARGET): CFLAGS += -O3
+%.o: %.cu
+	$(CC) $(CFLAGS) $(NVCC_COMPILE_ONLY_FLAGS) -c $<
+
 $(TARGET): $(OBJ)
 	$(CC) $(CFLAGS) $(OBJ) -o $(TARGET)
 
@@ -25,15 +28,16 @@ mem_test: clean
 	-valgrind ./test
 	
 mem: $(TARGET)
-	valgrind ./svm
+	valgrind ./$(TARGET)
 
 clean:
 	rm -f $(OBJ)
 	rm -f ./test
 	rm -f ./$(TARGET)
 
-run: clean $(TARGET)
-	./svm
+run: CFLAGS += -DTRACE=1
+run: $(TARGET)
+	./$(TARGET)
 
 # nodebug:
 # 	cc svm.c -o svm -DTRACE -lm

@@ -9,13 +9,13 @@
 
 using std::fscanf;
 using std::printf;
-using types::size;
+using types::index;
 
 inline std::vector<std::string> split(const char* str, const char* delim) {
     std::vector<std::string> ret;
     char* buf = new char[255];
-    size i = 0;
-    size buf_len = 0;
+    size_t i = 0;
+    size_t buf_len = 0;
     char c;
     do {
         c = str[i++];
@@ -42,10 +42,14 @@ class dataset {
   public:
     matrix X;
     vector Y;
+    int num_samples;
+    int num_features;
 
-    dataset(size num_features, size num_samples, std::FILE* input)
+    dataset(size_t num_features, size_t num_samples, std::FILE* input)
         : Y(vector(num_samples)),
-          X(matrix(num_samples, num_features)) {
+          X(matrix(num_samples, num_features)),
+          num_samples(num_samples),
+          num_features(num_features) {
 
         this->Y.set(0);
         std::map<std::string, integer> classes;
@@ -53,10 +57,10 @@ class dataset {
 
         char* buf = new char[200];
 
-        for (size i = 0; i < num_samples; i++) {
+        for (size_t i = 0; i < num_samples; i++) {
             fscanf(input, "%s", buf);
             auto values = split(buf, ",");
-            size j;
+            size_t j;
             for (j = 0; j < num_features; j++) {
                 // printf("str='%s'\n", values[j].c_str());
                 std::sscanf(values[j].c_str(), "%lf", &X[i][j]); // double free or corruption (!prev)
@@ -81,8 +85,8 @@ class dataset {
         return this->X;
     }
     void printX() {
-        for (size i = 0; i < X.rows; i++) {
-            for (size j = 0; j < X.cols; j++) {
+        for (size_t i = 0; i < X.rows; i++) {
+            for (size_t j = 0; j < X.cols; j++) {
                 std::printf("%5.3f ", X[i][j]);
             }
             std::printf("class=%d\n", Y[i]);

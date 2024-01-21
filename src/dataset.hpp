@@ -1,15 +1,12 @@
 #ifndef DATASET_H
-#define DATASET_H
+#define DATASET_H 1
 
 #include "types.hpp"
 
 #include <map>
 #include <string>
 #include <vector>
-
-using std::fscanf;
-using std::printf;
-using types::index;
+#include <cstdio>
 
 inline std::vector<std::string> split(const char* str, const char* delim) {
     std::vector<std::string> ret;
@@ -32,11 +29,11 @@ inline std::vector<std::string> split(const char* str, const char* delim) {
     return ret;
 }
 
-template <typename number, typename integer = int>
+template <typename number, typename label = int>
 // requires std::floating_point<number> && std::integral<integer>
 class dataset {
 
-    using vector = types::vector<integer>;
+    using vector = types::vector<label>;
     using matrix = types::matrix<number>;
 
   public:
@@ -52,8 +49,8 @@ class dataset {
           num_features(num_features) {
 
         this->Y.set(0);
-        std::map<std::string, integer> classes;
-        integer class_id = 0;
+        std::map<std::string, label> classes;
+        label class_id = 0;
 
         char* buf = new char[200];
 
@@ -63,7 +60,7 @@ class dataset {
             size_t j;
             for (j = 0; j < num_features; j++) {
                 // printf("str='%s'\n", values[j].c_str());
-                std::sscanf(values[j].c_str(), "%lf", &X[i][j]); // double free or corruption (!prev)
+                sscanf(values[j].c_str(), "%lf", &X[i][j]); // double free or corruption (!prev)
             }
             std::string class_name = values[j];
             if (classes.find(class_name) == classes.end()) {

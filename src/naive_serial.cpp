@@ -1,16 +1,18 @@
-#include "dataset.hpp"
+
+
 #include "types.hpp"
+
+#include "dataset.hpp"
+#include <cfloat>
 #include <cmath>
 #include <cstdio>
-#include <cstdlib>
-#include <float.h>
 
 #define max(a, b) a > b ? a : b
 #define min(a, b) a < b ? a : b
 
 using std::printf;
 using types::f64;
-using types::index;
+using types::index; // WARN: watch out for <string.h> or <cstring>
 using types::Kernel;
 using types::label;
 using types::matrix;
@@ -31,7 +33,7 @@ template <typename number, typename label> class SVM {
     vector<label> y;
     vector<number> w;
     number b;
-    Kernel k;
+    Kernel K;
     vector<number> a;
     vector<number> error;
 
@@ -44,7 +46,7 @@ template <typename number, typename label> class SVM {
           y(std::move(data.Y)),
           w(data.num_features),
           b(0),
-          k(kernel),
+          K(kernel),
           a(data.num_samples),
           error(data.num_samples),
           C(cost),
@@ -52,7 +54,7 @@ template <typename number, typename label> class SVM {
           diff_tol(diff_tolerance) {
 
         // HACK: find way to convert arbitrary Y labels to -1 +1 instead of this shit
-        this->y.mutate([](int a) -> int { return a == 0 ? 1 : -1; });
+        this->y.mutate([](int l) -> int { return l == 0 ? 1 : -1; });
         vec_print(y);
 
         // vector<bool> supports(100);
@@ -117,9 +119,19 @@ template <typename number, typename label> class SVM {
         // if the error is within tolerance and the a is outside of (0, C)
         // don't change anything for this i_2
         if ((r2 < -tol && a[i2] < C) || (r2 > tol && a[i2] > 0)) {
-            // if (number of non-zero & non-C a > 1)
-            if (1) {
-                index i1 = second_choice_heuristic(i2, E2);
+            // number of non-zero & non-C alphas
+            int non_zero_non_c = 0;
+            for (index i = 0; i < a.cols; i++) {
+                if (a[i] < types::epsilon || fabs(a[i] - C) < types::epsilon) {
+                    continue;
+                }
+                non_zero_non_c++;
+                if (non_zero_non_c > 1) { // no need to count them all
+                    break;
+                }
+            }
+            if (non_zero_non_c > 1) {
+                index i1 = second_choice_heuristic(E2);
                 if (takeStep(i1, i2) == 1) {
                     return 1;
                 }
@@ -181,7 +193,7 @@ template <typename number, typename label> class SVM {
         }
 
         // second derivative (f'')
-        f64 eta = 2 * k(x[i1], x[i2]) - k(x[i1], x[i1]) - k(x[i2], x[i2]);
+        f64 eta = 2 * K(x[i1], x[i2]) - K(x[i1], x[i1]) - K(x[i2], x[i2]);
 
         // printd(eta);
         f64 a_1 = 0, a_2 = 0;
@@ -255,7 +267,7 @@ template <typename number, typename label> class SVM {
         return 1;
     }
 
-    index second_choice_heuristic(index i_2, number E2) {
+    index second_choice_heuristic(number E2) {
         // Once a first Lagrange multiplier is chosen, SMO chooses the second Lagrange
         // multiplier to maximize the size of the step taken during joint optimization.
         // Evaluating the kernel function k is time consuming, so SMO approximates the step size
@@ -301,6 +313,15 @@ template <typename number, typename label> class SVM {
         return pred + b;
     }
 
+    number predict(vector<number> sample) {
+        // printf("      predict on %zu\n", i);
+        number pred = 0;
+        for (index j = 0; j < x.cols; j++) {
+            pred += w[j] * sample[j];
+        }
+        return pred + b;
+    }
+
     number compute_b() {
         number min_pos = DBL_MAX;
         number max_neg = -DBL_MAX;
@@ -342,20 +363,20 @@ template <typename number, typename label> class SVM {
             if (j == i1 || j == i2) { // skip i1 and i2
                 continue;
             }
-            v_1 += y[j] * a[j] * k(x[i1], x[j]);
+            v_1 += y[j] * a[j] * K(x[i1], x[j]);
         }
         f64 v_2 = 0;
         for (index j = 0; j < a.cols; j++) {
             if (j == i1 || j == i2) { // skip i1 and i2
                 continue;
             }
-            v_2 += y[j] * a[j] * k(x[i2], x[j]);
+            v_2 += y[j] * a[j] * K(x[i2], x[j]);
         }
 
         // constant part of objective function
-        // IDEA: cache it?
         // W(a) = \Sum_{i=3}^l a_i
         //      - \frac{1}{2} \Sum_{i=3}{l}\Sum_{j=3}{l} y_i y_j k(x_i, x_j) a_i a_j
+        // IDEA: cache it?
         f64 Wconst = 0;
         for (index i = 0; i < a.cols; i++) {
             // \Sum_{i=3}^n a_i
@@ -369,7 +390,7 @@ template <typename number, typename label> class SVM {
                 if (j == i1 || j == i2) { // skip i1 and i2
                     continue;
                 }
-                inner_sum += y[i] * y[j] * k(x[i], x[j]) * a[i] * a[j];
+                inner_sum += y[i] * y[j] * K(x[i], x[j]) * a[i] * a[j];
             }
             Wconst -= inner_sum / 2;
         }
@@ -380,11 +401,11 @@ template <typename number, typename label> class SVM {
         f64 g = a[i1] + (s * a[i2]);
         // clang-format off
     return g - (s * a2) + a2
-        - (k(x[i1], x[i1]) * (g - s * a2))
+        - (K(x[i1], x[i1]) * (g - s * a2))
         / 2
-        - (k(x[i2], x[i2]) * a2)
+        - (K(x[i2], x[i2]) * a2)
         / 2
-        - s * k(i1, i2) * (g - s * a2) * a2
+        - s * K(i1, i2) * (g - s * a2) * a2
         - y[i1] * (g - s * a2) * v_1
         - y[i2] * a2 * v_2
         + Wconst;
@@ -396,20 +417,20 @@ template <typename number, typename label> class SVM {
         // vector indexes = (vector){.cols = 100, = (fp[]){1, 51, 54, 8}};
         vector<int> indexes(20);
         indexes.set(1);
-        indexes.mutate([](int a) -> int { return std::rand() % 100; });
+        indexes.mutate([](int s) -> int { return (std::rand()+s) % 100; });
 
         int tp = 0;
         int fp = 0;
         int tn = 0;
         int fn = 0;
-        for (int sample_index = 0; sample_index < indexes.cols; sample_index++) {
+        for (index sample_index = 0; sample_index < indexes.cols; sample_index++) {
             int i = indexes[sample_index];
             f64 res = 0;
             puts("==========");
             printf("%d\n", i);
             auto example = x[i];
             // vec_print(example);
-            for (int j = 0; j < example.cols; j++) {
+            for (index j = 0; j < example.cols; j++) {
                 res += w[j] * example[j] + b;
             }
             printd(res);
@@ -455,7 +476,7 @@ template <typename number, typename label> class SVM {
     }
 };
 
-int main(int argc, char* argv[]) {
+int main(void) {
 
     f64 COST = 3;
     f64 TOL = 3e-3;
@@ -472,4 +493,5 @@ int main(int argc, char* argv[]) {
     SVM<f64, int> model(data, COST, TOL, 0.01, Linear_Kernel);
     vec_print(model.w);
     model.test();
+    return 0;
 }

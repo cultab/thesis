@@ -10,8 +10,8 @@
 namespace types {
 
 using f64 = double;
-using index = std::size_t;
 using label = int;
+using index = size_t;
 const int PRINT_AFTER = 15;
 const int PRINT_DIGITS = 1 + PRINT_AFTER + 2;
 const f64 f64_max = DBL_MAX;
@@ -34,10 +34,10 @@ const f64 epsilon = DBL_EPSILON;
 // const f64 epsilon = 0.001;
 
 template <typename number = f64, bool owns_memory = true> struct vector {
-    const size_t cols;
+    const index cols;
     number* data;
 
-    // auto get(std::size_t index) {
+    // auto get(index index) {
     //     return this->data[index];
     // }
 
@@ -46,7 +46,7 @@ template <typename number = f64, bool owns_memory = true> struct vector {
         this->data = start;
     }
     // sized constructor
-    vector(std::size_t cols) : cols(cols) {
+    vector(index cols) : cols(cols) {
         this->data = new number[cols];
     }
     // move constructor
@@ -58,6 +58,11 @@ template <typename number = f64, bool owns_memory = true> struct vector {
     // vector(vector<number, false>&& other) : cols(other.cols) {
     //     this->data = std::move(other.data);
     // }
+    vector copy() {
+        vector copy(this->cols);
+        memcpy(copy.data, this->data, this->cols * sizeof(number));
+        return copy;
+    }
 
     // move assignment
     vector& operator=(vector&& other) {
@@ -88,7 +93,7 @@ template <typename number = f64, bool owns_memory = true> struct vector {
         }
     }
 
-    number& operator[](std::size_t index) {
+    number& operator[](index index) {
         return this->data[index];
     }
 
@@ -116,7 +121,7 @@ template <typename number = f64> struct sparse_vector : vector<number> {
     index count;
 
     // sized constructor
-    sparse_vector(std::size_t cols) : vector<number>(cols) {
+    sparse_vector(index cols) : vector<number>(cols) {
         this->indexes = new number[cols];
     }
     // move constructor
@@ -168,16 +173,16 @@ template <typename number = f64> struct sparse_vector : vector<number> {
 };
 
 template <typename number> struct matrix {
-    const size_t rows;
-    const size_t cols;
+    const index rows;
+    const index cols;
     number* data;
 
-    // auto inline get(std::size_t row, std::size_t col) {
+    // auto inline get(index row, index col) {
     //     return this->data[row * this->cols + col];
     // }
 
     // sized constructor
-    matrix(std::size_t rows, std::size_t cols) : rows(rows), cols(cols) {
+    matrix(index rows, index cols) : rows(rows), cols(cols) {
         this->data = new number[cols * rows];
     }
     // move constructor
@@ -208,10 +213,10 @@ template <typename number> struct matrix {
         return this->data + rows * cols;
     }
     // returns a vector which does not deallocate it's data, since it's owned by this matrix
-    vector<number, false> operator[](std::size_t index) {
+    vector<number, false> operator[](index index) {
         return vector<number, false>(&(this->data[index * cols]), &(this->data[index * cols + cols]));
     }
-    vector<number, false> operator[](std::size_t index) const {
+    vector<number, false> operator[](index index) const {
         return vector<number, false>(&(this->data[index * cols]), &(this->data[index * cols + cols]));
     }
 };
@@ -227,47 +232,47 @@ const bool DEBUG = false;
 
 void inline _printd(const char* fmt, f64 var) {
     if constexpr (DEBUG) {
-        std::printf(fmt, PRINT_DIGITS, PRINT_AFTER, var);
+        printf(fmt, PRINT_DIGITS, PRINT_AFTER, var);
     }
 }
 
 void inline _printc(const char* fmt, const char* b) {
     if constexpr (DEBUG) {
-        std::printf(fmt, b);
+        printf(fmt, b);
     }
 }
 
 void inline _vec_print(const vector<int>& v, const char* msg) {
     if constexpr (DEBUG) {
-        std::puts(msg);
-        for (std::size_t j = 0; j < v.cols; j++) {
-            std::printf("%*.*d ", PRINT_DIGITS, PRINT_AFTER, v.data[j]);
+        puts(msg);
+        for (index j = 0; j < v.cols; j++) {
+            printf("%*.*d ", PRINT_DIGITS, PRINT_AFTER, v.data[j]);
         }
-        std::puts("");
+        puts("");
     }
 }
 
 void inline _vec_print(const vector<f64>& v, const char* msg) {
     if constexpr (DEBUG) {
-        std::puts(msg);
-        for (std::size_t j = 0; j < v.cols; j++) {
-            std::printf("%*.*lf", PRINT_DIGITS, PRINT_AFTER, v.data[j]);
+        puts(msg);
+        for (index j = 0; j < v.cols; j++) {
+            printf("%*.*lf", PRINT_DIGITS, PRINT_AFTER, v.data[j]);
             if (j % 4 == 0) {
-                std::puts("");
+                puts("");
             }
         }
-        std::puts("");
+        puts("");
     }
 }
 
 void inline _vec_print(const matrix<f64>& v, const char* msg) {
     if constexpr (DEBUG) {
-        std::puts(msg);
-        for (std::size_t i = 0; i < v.rows; i++) {
-            for (std::size_t j = 0; j < v.cols; j++) {
-                std::printf("%*.*f ", PRINT_DIGITS, PRINT_AFTER, v[i][j]);
+        puts(msg);
+        for (index i = 0; i < v.rows; i++) {
+            for (index j = 0; j < v.cols; j++) {
+                printf("%*.*f ", PRINT_DIGITS, PRINT_AFTER, v[i][j]);
             }
-            std::puts("");
+            puts("");
         }
     }
 }

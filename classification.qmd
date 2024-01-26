@@ -1,5 +1,5 @@
 
-# Classification
+# Classification {#sec:class}
 
 Classification is the process of assigning a class label to each sample of a dataset, an algorithm that classifies data is called a Classifier. It has a wide range of applications ranging from medical diagnosis [@medical] to natural language processing [@text] and building recognition [@alex] to financial fraud detection [@fraud]. As such lots of research has gone into improving classification accuracy (as well as minimizing run time)(?). This section will cover the training of classifiers, various categories of classifiers and finally various types of classifiers used today.
 
@@ -73,8 +73,11 @@ This subsection will go over a number of classifiers, as well as (their way of o
 
 ### Perceptron
 
-The perceptron is a binary linear classifier used in supervised learning <!-- TODO: reference -->. 
-It's a simplified model of brain neurons. It works by evaluating a function $f(x)$:
+The perceptron was first described as the McCulloch and Pitts neuron by @mcculloch43a in \citeyear{mcculloch43a}. Based upon that work \citeauthor{rosenbaltt1957perceptron} made one of the earliest attempts to replicate a biological neuron using digital circuits [@rosenbaltt1957perceptron, circa 1957]. The effectiveness of the perceptron was criticized by \citeauthor{minsky1969introduction} [@minsky1969introduction] leading to the work being largely ignored and further research to stop until much later.
+
+Today we would describe the perceptron as a binary linear classifier for use in supervised learning. As far as application of perceptron models go normal single layer perceptrons don't see much practical usage due to their simplicity and shortcommings involving non-linearly separable datasets, but they serve as the foundations of other models such as Multi-Layer Perceptrons or Neural Networks. They also see use in educational contexts exactly because of their simplicity to serve as an introduction to machine learning models.
+
+In simple terms it's a simplified model of brain neurons. It works by evaluating a function $f(x)$:
 
 \begin{equation}
 f(x) = 
@@ -92,37 +95,112 @@ $n$ is the number of inputs to the perceptron,
 
 and $b$ is a bias term used to shift the activation boundary away from the origin.
 
-#### Training
+#### Training Perceptrons
 
-#### Applications
+Training a perceptron involves a number of steps and the use of a label vector $y$ of $m$ elements $y_0, y_1 \unicodeellipsis y_m$ corresponding to each sample vector $x$. First the values for the $w$ and $b$ are chosen at random. Afterwards, for an input vector $x$, each sample is multiplied with it's coresponding weight in $w$, and the results plus the $b$ are summed up. Then the activation function $f(x)$ is used on the result and compaired to the coresponding label in $y$ in order to calculate a prediction error using a loss function [@hastie2001elements, pages 349-350]. Using the prediction error, $w$ and $b$ are adjusted. This is repeated for all $m$ input vectors until the perceptron has reached
+a satisfactory prediction accuracy.
 
 ### Neural Networks
 
-Neural networks can be simply thought of as a network of perceptrons [@neural-networks]. Many variants exist such as Deep Neural Networks [@deep-learning] for more complex classification problems and Convolutional Neural Networks [@cnn] for classification of images.
+Neural Networks are a wide category of models but in general can be simply thought of as a network of perceptrons [@neural-networks]. Many variants exist such as Deep Neural Networks [@deep-learning] for more complex classification problems and Convolutional Neural Networks [@cnn] for classification of images. Being such a wide category, Neural Networks have wide applications in all classification tasks mentioned in \nameref{sec:class}.
 
-#### Training ?
+ They are comprised by three types of layers:
 
-#### Applications
+1. The input layer, with $n$ neurons, one for each input sample.
+
+2. The hidden layers, with an arbitrary number of neurons for each layer.
+
+3. The output layer, that can include:
+    1. only one neuron for simple binary classification
+    2. multiple ones for confidence based multiclass classification
+    3. many more for use in other non-classification applications, as for example image generation where the output layer might include as many or more neurons as the input layer.
+
+#### Training Neural Networks
+
+The details of training a neural network depend on it's exact variant but the general case is as follows. First all the weights and bias term are chosen at random. Then the model is an input, with each sample going throught the network's neurons's activation functions. And finally the results are consolidated in the output layer. Now using backpropagation [@schmidhuber2022annotated, pages 9-10] and
+a loss function [@hastie2001elements, pages 349-350] the weights and biases of each neuron are recalculated. This is repeated for many inputs until a satisfactory model has been trained.
+
 
 ### K-Nearest Neighbor
 
+K-Nearest Neighbor also known as k-NN or KNN is an unsupervised learning technique for use in classification that works by finding the $k$ nearest neighbors of an input vector in the feature space and classifies inputs (also called the queries) according the the most common label of the found neighbors. A "1"-Nearest Neightbor algorithm is descripbed by @onenearest.
+Of note is the fact that training a k-NN model equals storing the training samples, a fact that restricts a naive implementation of the model based on the available memory and the size of the training dataset. Non-naive implementations include k-D Trees [@kdtree] and Ball Trees [@omohundro1989five] that attempt to deal with the inefficiencies of the algorithm.
+It is loosly related and not to be confused with the Kmeans clustering algorithm [@macqueen1967some].
 
-how
+#### Training and Prediction with k-NNs
 
-#### Training
-
-#### Applications
+As mentioned before, training such a model is very simple as it only involves storing the training inputs and their coresponding labels. The important part is correctly choosing an $k$ for the number of neighbors and the distance metric ---both depend on the dataset used. Selecting the value for $k$ requires the use of heuristic hyperparameter optimization techniques, which will be covered in !SOMEWHERE! <!-- TODO: reference the section from SVM -->. Appart from hyperparameter optimization, it can also benefit from dimensionallity reduction of the feature space, which will be also covered in <!-- TODO: above -->.
+The distance metric can be any Minkowski distance or in the case of text classfication a Levenshtein distance [@Levenshtein] can be used, again it highly depends on the shape of the data. Afterwards for a chosen $N$, predicting the class of an input is as simple as finding the $N$ closest training inputs
 
 ### Naive Bayes
 
-Naive Bayes is a classifier based on the Bayes Theorem \ref{eq:bt} and the "naive" assumption that the features of the classes are independent.
+Naive Bayes is a classifier based on the Bayes Theorem \ref{eq:bt} and the "naive" assumption that the features of the classes are independent of one another.
 
 \begin{equation}
 \label{eq:bt}
 P(A|B) = \frac{P(B|A)P(A)}{P(B)}
 \end{equation}
 
-#### Applications
+
+From \ref{eq:bt} according to @zhang2004optimality
+
+we can say that the probability that a sample $x$ with features $<x_1, x_2, ..., x_n>$ belongs in class $c$ is:
+
+\begin{equation}
+P(c|x) = \frac{P(x|c)P(c)}{P(x)}
+\end{equation}
+
+And $x$ is classified in class $C$ iif:
+
+\begin{equation}
+f_b(x) = \frac{P(C = +|x)}{P(C = -|x)} \geq 1,
+\end{equation}
+
+Again given the naive assumption that features are independent:
+
+\begin{equation}
+\label{eq:nb}
+f_nb(x) = \frac{P(C = +|x)}{P(C = -|x)} \prod_{i=1}^{n}\frac{P(x_i|C = +)}{P(x_i| C = -)}
+\end{equation}
+
+As such the function $f_nb(x)$ is the Naive Bayes Classifier.
+
+#### Types of NB Classifiers
+
+* Gaussian
+
+* Multinomial
+
+* Bernoulli
+
+* Complement
+
+* Categorical
+
+<!-- Gaussian Naive Bayes: gaussiannb is used in classification tasks and it assumes that feature values follow a gaussian distribution. -->
+<!-- Multinomial Naive Bayes: It is used for discrete counts. For example, let’s say,  we have a text classification problem. Here we can consider Bernoulli trials which is one step further and instead of “word occurring in the document”, we have “count how often word occurs in the document”, you can think of it as “number of times outcome number x_i is observed over the n trials”. -->
+<!-- Bernoulli Naive Bayes: The binomial model is useful if your feature vectors are boolean (i.e. zeros and ones). One application would be text classification with ‘bag of words’ model where the 1s & 0s are “word occurs in the document” and “word does not occur in the document” respectively. -->
+<!-- Complement Naive Bayes: It is an adaptation of Multinomial NB where the complement of each class is used to calculate the model weights. So, this is suitable for imbalanced data sets and often outperforms the MNB on text classification tasks. -->
+<!-- Categorical Naive Bayes: Categorical Naive Bayes is useful if the features are categorically distributed. We have to encode the categorical variable in the numeric format using the ordinal encoder for using this algorithm. -->
+
+
+#### Training and Prediction with Naive Bayes
+
+A Naive Bayes model is "trained" throught calculating the probabilities needed. First the a priori probabilities $P(c)$ of each class are calculated using their frequency of appearance in the training set:
+
+\begin{equation}
+\label{eq:apriory_freq}
+P(c_i)= \frac{n_i}{N}
+\end{equation}
+
+$n_i$ is the number of samples of class $c_i$
+and $N$ is the total number of samples.
+
+Then, depending on the exact type of Naive Bayes used, the probability of each feature given a class is calcutated.
+
+A kernel function to estimate the probability of (?) TODO may be used to improve it's performance much like it's used for dimensionallity reduction in <!-- TODO: ref -->
+
+[@zhang2004optimality]
 
 ### SVM
 

@@ -32,7 +32,8 @@ format:
         fontsize: 11pt # ok
         mainfont: Liberation Serif # ok
         sansfont: Liberation Sans # ok
-        monofont: Source Code Pro # ok
+        # monofont: Source Code Pro # ok
+        monofont: Monaspace Argon
         linestretch: 1.5 # ok
 # output: 
 #     pdf:

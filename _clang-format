@@ -4,7 +4,8 @@ IndentWidth: 4
 Language: Cpp
 ColumnLimit: 120
 AlignAfterOpenBracket: Align
-PackConstructorInitializers: CurrentLine
+PackConstructorInitializers: Never #CurrentLine
 AllowShortFunctionsOnASingleLine: Empty
 ReferenceAlignment: Left
 PointerAlignment: Left
+AlwaysBreakTemplateDeclarations: Yes

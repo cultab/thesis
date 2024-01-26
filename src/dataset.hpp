@@ -1,74 +1,90 @@
+#include <cstdlib>
+#include <sstream>
 #ifndef DATASET_H
 #define DATASET_H 1
 
 #include "types.hpp"
 
+#include <cstdio>
 #include <map>
 #include <string>
 #include <vector>
-#include <cstdio>
 
-inline std::vector<std::string> split(const char* str, const char* delim) {
-    std::vector<std::string> ret;
-    char* buf = new char[255];
-    size_t i = 0;
-    size_t buf_len = 0;
-    char c;
-    do {
-        c = str[i++];
-        if (c == *delim || c == '\0') {
-            buf_len = 0;
-            ret.push_back(buf);
-            // printf("push_back: '%s'\n", buf);
-        } else {
-            buf[buf_len++] = c;
-        }
+#include "matrix.hpp"
+#include "vector.hpp"
 
-    } while (c != '\0');
-    delete[] buf;
-    return ret;
+using types::idx;
+using types::label;
+
+// REF: https://stackoverflow.com/a/46931770/13525363
+inline std::vector<std::string> split(const std::string& s, char delim) {
+    std::vector<std::string> result;
+    std::stringstream ss(s);
+    std::string item;
+
+    while (getline(ss, item, delim)) {
+        result.push_back(item);
+    }
+
+    return result;
 }
 
-template <typename number, typename label = int>
-// requires std::floating_point<number> && std::integral<integer>
 class dataset {
 
     using vector = types::vector<label>;
-    using matrix = types::matrix<number>;
+    using matrix = types::matrix;
 
   public:
     matrix X;
     vector Y;
-    int num_samples;
-    int num_features;
+    size_t num_samples;
+    size_t num_features;
+    label num_classes;
+    std::map<label, std::string> classes;
 
-    dataset(size_t num_features, size_t num_samples, std::FILE* input)
-        : Y(vector(num_samples)),
-          X(matrix(num_samples, num_features)),
-          num_samples(num_samples),
-          num_features(num_features) {
+    dataset(size_t features, size_t samples, std::FILE* input, char delim, bool header = false)
+        : X(matrix(samples, features)),
+          Y(vector(samples)),
+          num_samples(samples),
+          num_features(features) {
 
         this->Y.set(0);
-        std::map<std::string, label> classes;
+        std::map<std::string, label> class_to_label;
         label class_id = 0;
 
         char* buf = new char[200];
 
-        for (size_t i = 0; i < num_samples; i++) {
+        puts("HERE");
+        // discard header
+        if (header) {
+            puts("header");
+            // FIX: fgets ?
+            fscanf(input, "%[^\n]\n", buf);
+            printf("|%s|\n", buf);
+        }
+
+        for (size_t i = 0; i < samples; i++) {
             fscanf(input, "%s", buf);
-            auto values = split(buf, ",");
+            auto values = split(buf, delim);
             size_t j;
-            for (j = 0; j < num_features; j++) {
-                // printf("str='%s'\n", values[j].c_str());
+            for (j = 0; j < features; j++) {
+                printf("str='%s'\n", values[j].c_str());
                 sscanf(values[j].c_str(), "%lf", &X[i][j]); // double free or corruption (!prev)
             }
             std::string class_name = values[j];
-            if (classes.find(class_name) == classes.end()) {
-                classes[class_name] = class_id++;
+            // puts(class_name.c_str());
+            if (class_to_label.find(class_name) == class_to_label.end()) {
+                class_to_label[class_name] = class_id++;
             }
-            Y[i] = classes[class_name];
+            Y[i] = class_to_label[class_name];
         }
         delete[] buf;
+        num_classes = class_id;
+        printf("num_classes=%d\n", num_classes);
+
+        for (auto i : class_to_label) {
+            classes[i.second] = i.first;
+        }
     }
 
     ~dataset() {
@@ -80,14 +96,6 @@ class dataset {
     }
     matrix& getX() {
         return this->X;
-    }
-    void printX() {
-        for (size_t i = 0; i < X.rows; i++) {
-            for (size_t j = 0; j < X.cols; j++) {
-                std::printf("%5.3f ", X[i][j]);
-            }
-            std::printf("class=%d\n", Y[i]);
-        }
     }
 };
 

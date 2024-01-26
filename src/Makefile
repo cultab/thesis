@@ -1,5 +1,9 @@
 CC := nvcc
 
+SRC := naive_serial.cu matrix.cu
+OBJ := $(SRC:.cu=.o)
+TARGET := naive_serial
+
 # colorize output of nvcc like gcc
 GRC := $(shell command -v grc 2> /dev/null)
 ifdef GRC
@@ -12,7 +16,7 @@ NVCCFLAGS := --device-c
 # REF: https://interrupt.memfault.com/blog/best-and-worst-gcc-clang-compiler-flags#-wundef
 # REF: https://developers.redhat.com/blog/2018/03/21/compiler-and-linker-flags-gcc
 
-CFLAGS := --std=c++17 -pipe
+CFLAGS := --std=c++20 -pipe
 # dependency generation
 CFLAGS += -MMD -MP
 
@@ -25,9 +29,11 @@ CFLAGS += -O1
 ############
 CFLAGS += -Wall -Wextra
 # -f    WARN: remove -fsanitize=address in benchmarks
-CFLAGS += -fsanitize=address -fno-common -ffunction-sections -fdata-sections
+# CFLAGS += -fsanitize=address -fno-common
+# -ffunction-sections -fdata-sections
 # typing
-CFLAGS += -Wstrict-null-sentinel -Wdouble-promotion -Wcast-qual -Wzero-as-null-pointer-constant -Wlogical-op -Wconversion -Wold-style-cast
+CFLAGS += -Wstrict-null-sentinel -Wdouble-promotion -Wcast-qual -Wlogical-op -Wconversion
+# CFLAGS += -Wold-style-cast -Wzero-as-null-pointer-constant 
 # control flow
 CFLAGS += -Wimplicit-fallthrough=5 -Wnull-dereference -Wduplicated-branches
 # OOP
@@ -35,16 +41,14 @@ CFLAGS += -Wctor-dtor-privacy -Wnon-virtual-dtor -Wsuggest-final-types -Wsuggest
 # format
 CFLAGS +=  -Wformat=2 -Wformat-overflow -Wformat-security -Wformat-signedness
 # useless code
-CFLAGS += -Wuseless-cast -Wextra-semi -Wredundant-decls -Wunused-parameter
+CFLAGS += -Wuseless-cast -Wextra-semi -Wunused-parameter
+# CFLAGS += -Wredundant-decls
 # other
-CFLAGS += -Wpadded -Wshadow
+# CFLAGS += -Wpadded
+CFLAGS += -Wshadow
 
-LDFLAGS := -Wl,--gc-sections,--print-gc-sections
+# LDFLAGS := -Wl,--gc-sections,--print-gc-sections
 LDLIBS := -lm
-
-SRC := naive_serial.cpp
-OBJ := $(SRC:.cpp=.o)
-TARGET := naive_serial
 
 all: options $(TARGET)
 
@@ -56,7 +60,7 @@ options:
 	@echo "NVCCFLAGS   = $(NVCCFLAGS)"
 	@echo "LDLIBS      = $(LDLIBS)"
 	@echo "LDFLAGS     = $(LDFLAGS)"
-	@echo "CUDA_SRC    = $(CUDA_SRC)"
+	@echo "SRC         = $(SRC)"
 	@echo "OBJ         = $(OBJ)"
 
 # dependencies
@@ -90,7 +94,8 @@ clean:
 	rm -f ./$(TARGET)
 
 run: CFLAGS += -DTRACE=1
+run: CFLAGS += -g
 run: $(TARGET)
 	./$(TARGET)
 
-.PHONY: run clean mem mem_test all options
+.PHONY: run clean mem mem_test all options *.d

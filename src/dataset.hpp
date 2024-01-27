@@ -29,6 +29,12 @@ inline std::vector<std::string> split(const std::string& s, char delim) {
     return result;
 }
 
+struct dataset_shape {
+    idx num_samples;
+    idx num_features;
+    idx num_classes;
+};
+
 class dataset {
 
     using vector = types::vector<label>;
@@ -37,16 +43,16 @@ class dataset {
   public:
     matrix X;
     vector Y;
-    size_t num_samples;
-    size_t num_features;
-    label num_classes;
+    // size_t num_samples;
+    // size_t num_features;
+    // label num_classes;
+    dataset_shape shape;
     std::map<label, std::string> classes;
 
     dataset(size_t features, size_t samples, std::FILE* input, char delim, bool header = false)
         : X(matrix(samples, features)),
           Y(vector(samples)),
-          num_samples(samples),
-          num_features(features) {
+          shape({.num_samples = samples, .num_features = features}) {
 
         this->Y.set(0);
         std::map<std::string, label> class_to_label;
@@ -54,10 +60,9 @@ class dataset {
 
         char* buf = new char[200];
 
-        puts("HERE");
         // discard header
         if (header) {
-            puts("header");
+            puts("header:");
             // FIX: fgets ?
             fscanf(input, "%[^\n]\n", buf);
             printf("|%s|\n", buf);
@@ -79,8 +84,7 @@ class dataset {
             Y[i] = class_to_label[class_name];
         }
         delete[] buf;
-        num_classes = class_id;
-        printf("num_classes=%d\n", num_classes);
+        this->shape.num_classes = static_cast<idx>(class_id);
 
         for (auto i : class_to_label) {
             classes[i.second] = i.first;

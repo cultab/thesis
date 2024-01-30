@@ -5,13 +5,17 @@
 
 #include "types.hpp"
 
+#include "GPUSVM.hpp"
 #include "OVA.hpp"
-#include "SVM_serial.hpp"
+// #include "SMO.hpp"
 #include "cuda_helpers.h"
 #include "dataset.hpp"
 #include "vector.hpp"
 
 using std::printf;
+// using SVM::SMO;
+using SVM::GPUSVM;
+using types::base_vector;
 using types::cuda_vector;
 using types::idx;
 using types::Kernel;
@@ -19,7 +23,7 @@ using types::label;
 using types::number;
 using types::vector;
 
-number Linear_Kernel(vector<number> a, vector<number> b) {
+__host__ __device__ number Linear_Kernel(base_vector<number> a, base_vector<number> b) {
     number res = 0;
     for (idx k = 0; k < a.cols; k++) {
         res += a[k] * b[k];
@@ -28,7 +32,7 @@ number Linear_Kernel(vector<number> a, vector<number> b) {
 }
 
 // for xor -> degree = 3, gamma = 0
-number Polynomial_Kernel(vector<number> a, vector<number> b) {
+__host__ __device__ number Polynomial_Kernel(base_vector<number> a, base_vector<number> b) {
     number gamma = 0;
     number degree = 3;
     number res = 0;
@@ -40,7 +44,7 @@ number Polynomial_Kernel(vector<number> a, vector<number> b) {
 }
 
 // TODO: this don't work :|
-number RBF_Kernel(vector<number> a, vector<number> b) {
+__host__ __device__ number RBF_Kernel(base_vector<number> a, base_vector<number> b) {
     assert(false && "this don't work fren");
     number gamma = 0.01;
     number res = 0;
@@ -81,21 +85,21 @@ int main(void) {
     // puts("here");
     // cudaLastErr();
     // exit(0);
-    vector<number> a(3);
-    a[0] = 0.3;
-    a[1] = 1.7;
-    a[2] = -3.7;
-    vector<number> b(3);
-    b[0] = -1.3;
-    b[1] = 2.5;
-    b[2] = -3.7;
-    vector<number> c(3);
-    c[0] = -1.3;
-    c[1] = 2.4;
-    c[2] = -3.7;
+    // vector<number> a(3);
+    // a[0] = 0.3;
+    // a[1] = 1.7;
+    // a[2] = -3.7;
+    // vector<number> b(3);
+    // b[0] = -1.3;
+    // b[1] = 2.5;
+    // b[2] = -3.7;
+    // vector<number> c(3);
+    // c[0] = -1.3;
+    // c[1] = 2.4;
+    // c[2] = -3.7;
     // auto res = RBF_Kernel(a, a);
-    auto res = RBF_Kernel(b, a);
-    printf("res = %.25f\n", res);
+    // auto res = RBF_Kernel(b, a);
+    // printf("res = %.25f\n", res);
     // exit(0);
 
     auto wine = std::fopen("../datasets/winequality-red.csv", "r");
@@ -122,8 +126,10 @@ int main(void) {
     // number (*t)(vector<number>, vector<number>) = Polynomial_Kernel<>;
 
     // SVM::OVA ova(data.shape, data.X, data.Y, {.cost = 3, .tolerance = 3e-3, .diff_tolerance = 0.01}, Linear_Kernel);
-    SVM::OVA ova(data.shape, data.X, data.Y, {.cost = 30, .tolerance = 3e-3, .diff_tolerance = 0.001}, Polynomial_Kernel);
-    // SVM::OVA ova(data.shape, data.X, data.Y, { .cost = 300, .tolerance = 3e-1, .diff_tolerance =  0.000000001 }, RBF_Kernel);
+    SVM::OVA<GPUSVM> ova(data.shape, data.X, data.Y, {.cost = 30, .tolerance = 3e-3, .diff_tolerance = 0.001},
+                         Polynomial_Kernel);
+    // SVM::OVA ova(data.shape, data.X, data.Y, { .cost = 300, .tolerance = 3e-1, .diff_tolerance =  0.000000001 },
+    // RBF_Kernel);
     ova.train();
     getchar();
     ova.test(data);

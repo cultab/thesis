@@ -1,12 +1,14 @@
-#include <iostream>
 #ifndef SVM_HPP
 #define SVM_HPP 1
 
+#include <iostream>
+#include <cmath>
+
+#include "SVM_common.hpp"
 #include "dataset.hpp"
 #include "matrix.hpp"
 #include "types.hpp"
 #include "vector.hpp"
-#include <cmath>
 
 #define max(a, b) a > b ? a : b
 #define min(a, b) a < b ? a : b
@@ -20,13 +22,7 @@ using types::matrix;
 using types::number;
 using types::vector;
 
-struct hyperparams {
-    number cost;
-    number tolerance;
-    number diff_tolerance;
-};
-
-class SVM {
+class SMO {
 
   public:
     matrix& x;
@@ -41,7 +37,7 @@ class SVM {
     number tol;      // KKT tolerance
     number diff_tol; // alpha diff tolerance ?
 
-    SVM(dataset_shape& shape, matrix& _x, vector<label>& _y, hyperparams params, Kernel kernel)
+    SMO(dataset_shape& shape, matrix& _x, vector<label>& _y, hyperparams params, Kernel kernel)
         : x(_x),
           y(std::move(_y)),
           w(shape.num_features),
@@ -53,7 +49,6 @@ class SVM {
           tol(params.tolerance),
           diff_tol(params.diff_tolerance) {
 
-        puts("IN HERE NOW");
         // w.set(1); // ERROR: watch out
         w.set(types::epsilon);
         // for (idx i = 0; i < w.cols; i++) {

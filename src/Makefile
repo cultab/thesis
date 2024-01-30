@@ -16,12 +16,13 @@ NVCCFLAGS := --device-c
 # REF: https://interrupt.memfault.com/blog/best-and-worst-gcc-clang-compiler-flags#-wundef
 # REF: https://developers.redhat.com/blog/2018/03/21/compiler-and-linker-flags-gcc
 
-CFLAGS := --std=c++20 -pipe
+CFLAGS := --std=c++20 -pipe -fmax-errors=1
 # dependency generation
 CFLAGS += -MMD -MP
 
 CFLAGS += --optimization-info inline --generate-line-info
-CFLAGS += -arch=sm_61 -forward-unknown-to-host-compiler
+CFLAGS += -arch=sm_75 -forward-unknown-to-host-compiler --expt-relaxed-constexpr
+# CFLAGS += -arch=sm_61 -forward-unknown-to-host-compiler
 CFLAGS += -O1
 # CFLAGS += -O2 -free-loop-vectorize
 ############
@@ -41,8 +42,8 @@ CFLAGS += -Wctor-dtor-privacy -Wnon-virtual-dtor -Wsuggest-final-types -Wsuggest
 # format
 CFLAGS +=  -Wformat=2 -Wformat-overflow -Wformat-security -Wformat-signedness
 # useless code
-CFLAGS += -Wuseless-cast -Wextra-semi -Wunused-parameter
-# CFLAGS += -Wredundant-decls
+CFLAGS += -Wextra-semi -Wunused-parameter
+# CFLAGS += -Wredundant-decls -Wuseless-cast
 # other
 # CFLAGS += -Wpadded
 CFLAGS += -Wshadow

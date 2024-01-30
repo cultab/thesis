@@ -20,7 +20,7 @@ using label = int;
 using idx = size_t;
 const int PRINT_AFTER = 24;
 const int PRINT_DIGITS = 4 + PRINT_AFTER + 2;
-const number number_max = DBL_MAX;
+const number NUM_MAX = DBL_MAX;
 
 #define printd(var)                                                                                                    \
     do {                                                                                                               \

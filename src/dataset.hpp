@@ -52,7 +52,7 @@ class dataset {
     dataset(size_t features, size_t samples, std::FILE* input, char delim, bool header = false)
         : X(matrix(samples, features)),
           Y(vector(samples)),
-          shape({.num_samples = samples, .num_features = features}) {
+          shape({.num_samples = samples, .num_features = features, .num_classes = 0}) {
 
         this->Y.set(0);
         std::map<std::string, label> class_to_label;

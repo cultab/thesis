@@ -1,19 +1,21 @@
 #ifndef OVA_HPP
 #define OVA_HPP 1
-#include "SVM_serial.hpp"
+#include "SVM_common.hpp"
 #include "dataset.hpp"
 
 using types::idx;
 using types::label;
 using types::vector;
+using types::matrix;
 
 namespace SVM {
 
 // One V All
 // n models for n classes
+template <typename SVM_IMPL>
 class OVA {
 
-    vector<SVM*> models;
+    vector<SVM_IMPL*> models;
     hyperparams params;
 
   public:
@@ -28,7 +30,7 @@ class OVA {
             // mutate as mentioned
             labels.mutate([cls](int l) -> int { return l == cls ? 1 : -1; });
             // train svm
-            auto model = new SVM(shape,x, labels, this->params, kernel);
+            auto model = new SVM_IMPL(shape,x, labels, this->params, kernel);
             models[static_cast<idx>(cls)] = model;
         }
     }

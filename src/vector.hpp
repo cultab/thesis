@@ -4,8 +4,16 @@
 #include <assert.h>
 #include <functional>
 
+#include <cooperative_groups.h>
+
 #include "cuda_helpers.h"
 #include "types.hpp"
+
+namespace cg = cooperative_groups;
+
+using cg::grid_group;
+using cg::this_grid;
+using cg::thread_group;
 
 namespace types {
 
@@ -35,7 +43,7 @@ struct base_vector {
           data(nullptr),
           view(false) {}
 
-    T& operator[](idx i) {
+    __host__ __device__ T& operator[](idx i) {
         assert(i < this->cols);
         return this->data[i];
     }
@@ -116,6 +124,12 @@ struct vector : public base_vector<T> {
         return *this;
     }
 
+    // copy conversion constructor
+    vector(cuda_vector<T>& other)
+        : base_vector<T>(other.cols) {
+        *this = other;
+    }
+
     // copy convert
     vector<T>& operator=(cuda_vector<T>& other) {
         if (this->cols != other.cols || this->data == nullptr) {
@@ -174,7 +188,8 @@ struct cuda_vector : public base_vector<T> {
     }
 
     // copy constructor
-    cuda_vector(cuda_vector& other) : base_vector<T>(other.cols) {
+    cuda_vector(cuda_vector& other)
+        : base_vector<T>(other.cols) {
         *this = other;
     }
     // copy assignment
@@ -212,9 +227,106 @@ struct cuda_vector : public base_vector<T> {
             cudaErr(cudaFree(this->data));
         }
     }
+
+    // // reduce the array to a single value stored at  TODO: which index?
+    // __device__ void reduce(std::function<T(idx)> func) {
+    //     unsigned int tid = blockDim.x * blockIdx.x + threadIdx.x;
+    //     unsigned int stride = blockDim.x * gridDim.x;
+    // }
+    //
+    // __device__ number min() {
+    //     unsigned int tid = blockDim.x * blockIdx.x + threadIdx.x;
+    //     unsigned int stride = blockDim.x * gridDim.x;
+    //     grid_group grid = this_grid();
+    //
+    //     number local_min = -types::NUM_MAX;
+    //     __shared__ number block_local_min;
+    //     __device__ number true_min;
+    //
+    //     if (tid == 0) {
+    //         true_min = -types::NUM_MAX;
+    //     }
+    //
+    //     if (threadIdx.x == 0) {
+    //         block_local_min = -types::NUM_MAX;
+    //     }
+    //
+    //     // find local min
+    //     for (idx i = tid; i < this->cols; i += stride) {
+    //         if (this->data[i] < local_min) {
+    //             local_min = this->data[i];
+    //         }
+    //     }
+    //     // find block local min
+    //     atomicMin(&block_local_min, local_min);
+    //     __syncthreads();
+    //
+    //     // block leaders find true min
+    //     if (threadIdx.x == 0) {
+    //         atomicMin(&true_min, block_local_min);
+    //     }
+    //     grid.sync();
+    //     return true_min;
+    // }
+    //
+    // __device__ number max() {
+    //     unsigned int tid = blockDim.x * blockIdx.x + threadIdx.x;
+    //     unsigned int stride = blockDim.x * gridDim.x;
+    //     grid_group grid = this_grid();
+    //
+    //     number local_max = -types::NUM_MAX;
+    //     __shared__ number block_local_max;
+    //     __device__ number true_max;
+    //
+    //     if (tid == 0) {
+    //         true_max = -types::NUM_MAX;
+    //     }
+    //
+    //     if (threadIdx.x == 0) {
+    //         block_local_max = -types::NUM_MAX;
+    //     }
+    //
+    //     // find local max
+    //     for (idx i = tid; i < this->cols; i += stride) {
+    //         if (this->data[i] < local_max) {
+    //             local_max = this->data[i];
+    //         }
+    //     }
+    //     // find block local max
+    //     atomicMax(&block_local_max, local_max);
+    //     __syncthreads();
+    //
+    //     // block leaders find true max
+    //     if (threadIdx.x == 0) {
+    //         atomicMax(&true_max, block_local_max);
+    //     }
+    //     grid.sync();
+    //     return true_max;
+    // }
+
+    __device__ void mutate(std::function<__device__ T(idx)> func) {
+        unsigned int tid = blockDim.x * blockIdx.x + threadIdx.x;
+        unsigned int stride = blockDim.x * gridDim.x;
+        grid_group grid = this_grid();
+
+        for (idx i = tid; i < this->cols; i += stride) {
+            this->data[i] = func(i);
+        }
+        grid.sync();
+    }
+
+    __device__ void set(T value) {
+        unsigned int tid = blockDim.x * blockIdx.x + threadIdx.x;
+        unsigned int stride = blockDim.x * gridDim.x;
+        grid_group grid = this_grid();
+        for (idx i = tid; i < this->cols; i += stride) {
+            this->data[i] = value;
+        }
+        grid.sync();
+    }
 };
 
-typedef number (*Kernel)(vector<number>, vector<number>);
+typedef number (*Kernel)(base_vector<number>, base_vector<number>);
 
 // using Kernel = std::function<number(vector<number>, vector<number>)>;
 

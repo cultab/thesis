@@ -3,14 +3,18 @@
 
 #include "types.hpp"
 
-using types::number;
+using types::math_t;
 
 namespace SVM {
 
+enum Kernel_t { POLY, RBF, LINEAR };
+
+static const char* Kernel_t_name[] = {"POLYNOMIAL", "RADIAL BASIS FUNC", "LINEAR"};
+
 struct hyperparams {
-    number cost;
-    number tolerance;
-    number diff_tolerance;
+    math_t cost;
+    math_t tolerance;
+    math_t diff_tolerance;
 };
 } // namespace SVM
 #endif // SVM_COMMON_HPP

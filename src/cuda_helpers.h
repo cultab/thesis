@@ -16,7 +16,8 @@ inline void printError() {}
 #define err(ans, msg)                                                                                                  \
     do {                                                                                                               \
         if (ans == nullptr) {                                                                                          \
-            fprintf(stderr, "error: \"%s\" in file %s at line %d.\n", msg, __FILE__, __LINE__)                         \
+            printf(stderr, "error: \"%s\" in file %s at line %d.\n", msg, __FILE__, __LINE__);                        \
+            exit(-1);                                                                                                  \
         }                                                                                                              \
     } while (0)
 

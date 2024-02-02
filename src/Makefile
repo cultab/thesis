@@ -1,6 +1,6 @@
 CC := nvcc
 
-SRC := naive_serial.cu matrix.cu
+SRC := naive_serial.cu
 OBJ := $(SRC:.cu=.o)
 TARGET := naive_serial
 
@@ -20,8 +20,8 @@ CFLAGS := --std=c++20 -pipe -fmax-errors=1
 # dependency generation
 CFLAGS += -MMD -MP
 
-CFLAGS += --optimization-info inline --generate-line-info
-CFLAGS += -arch=sm_75 -forward-unknown-to-host-compiler --expt-relaxed-constexpr
+CFLAGS += --optimization-info inline --generate-line-info -lineinfo
+CFLAGS += -arch=sm_61 -forward-unknown-to-host-compiler --expt-relaxed-constexpr --extended-lambda
 # CFLAGS += -arch=sm_61 -forward-unknown-to-host-compiler
 CFLAGS += -O1
 # CFLAGS += -O2 -free-loop-vectorize

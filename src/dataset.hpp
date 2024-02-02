@@ -38,7 +38,7 @@ struct dataset_shape {
 class dataset {
 
     using vector = types::vector<label>;
-    using matrix = types::matrix;
+    using matrix = types::matrix<types::math_t>;
 
   public:
     matrix X;
@@ -73,8 +73,8 @@ class dataset {
             auto values = split(buf, delim);
             size_t j;
             for (j = 0; j < features; j++) {
-                printf("str='%s'\n", values[j].c_str());
-                sscanf(values[j].c_str(), "%lf", &X[i][j]); // double free or corruption (!prev)
+                // printf("str='%s'\n", values[j].c_str());
+                sscanf(values[j].c_str(), "%lf", &X[i][j]);
             }
             std::string class_name = values[j];
             // puts(class_name.c_str());

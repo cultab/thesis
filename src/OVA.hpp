@@ -19,7 +19,7 @@ class OVA {
     hyperparams params;
 
   public:
-    OVA(dataset_shape& shape, matrix& x, vector<label>& y, hyperparams _params, types::Kernel kernel)
+    OVA(dataset_shape& shape, matrix<math_t>& x, vector<label>& y, hyperparams _params, Kernel_t kernel)
         : models(static_cast<idx>(shape.num_classes == 2 ? 1 : shape.num_classes)),
           params(_params) {
 
@@ -39,17 +39,19 @@ class OVA {
         for (idx i = 0; i < models.cols; i++) {
             printf("Training model %zu\n", i);
             models[i]->train();
+            models[i]->compute_w();
+            printf("Done training model %zu\n", i);
             printd(models[i]->w);
         }
     }
 
-    std::tuple<label, number> predict(vector<number> sample) {
+    std::tuple<label, math_t> predict(vector<math_t> sample) {
         label cls = 0;
-        number max_pred = models[static_cast<idx>(cls)]->predict(sample);
+        math_t max_pred = models[static_cast<idx>(cls)]->predict(sample);
         printf("model %d: %f\n", cls, max_pred);
 
         for (idx i = 1; i < models.cols; i++) {
-            number tmp = models[i]->predict(sample);
+            math_t tmp = models[i]->predict(sample);
             printf("model %zu: %f\n", i, tmp);
             if (tmp > max_pred) {
                 cls = static_cast<label>(i);
@@ -59,7 +61,7 @@ class OVA {
         if (models.cols == 1) {
             cls = max_pred > 0 ? 0 : 1;
         }
-        return std::tuple<label, number>(cls, max_pred);
+        return std::tuple<label, math_t>(cls, max_pred);
     }
 
     ~OVA() {
@@ -77,7 +79,7 @@ class OVA {
             // }
             puts("==========");
             printf("%zu\n", i);
-            vector<number> example = data.X[i];
+            vector<math_t> example = data.X[i];
 
             auto [pred, score] = this->predict(example);
 
@@ -94,7 +96,7 @@ class OVA {
         }
         printd(correct);
         printd(incorrect);
-        number accuracy = (correct) / static_cast<number>(correct + incorrect);
+        math_t accuracy = (correct) / static_cast<math_t>(correct + incorrect);
         printf("acc %lf\n", accuracy);
 
         // for (auto m : models) {

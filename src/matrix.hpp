@@ -6,10 +6,14 @@
 
 namespace types {
 
+template <typename T>
+struct cuda_matrix;
+
+template <typename T>
 struct base_matrix {
     idx rows;
     idx cols;
-    number* data;
+    T* data;
     base_matrix()
         : rows(0),
           cols(0),
@@ -19,25 +23,30 @@ struct base_matrix {
           cols(_cols),
           data(nullptr) {}
 
-    number* begin() {
+    T* begin() {
         return this->data;
     }
 
-    number* end() {
+    T* end() {
         return this->data + rows * cols;
+    }
+
+    auto shape() {
+        return std::make_tuple(rows, cols);
     }
 };
 
-struct matrix : base_matrix {
+template <typename T>
+struct matrix : public base_matrix<T> {
 
     // sized constructor
     matrix(idx _rows, idx _cols)
-        : base_matrix(_rows, _cols) {
-        this->data = new number[_cols * _rows];
+        : base_matrix<T>(_rows, _cols) {
+        this->data = new T[_cols * _rows];
     }
     // move constructor
     matrix(matrix&& other)
-        : base_matrix(other.rows, other.cols) {
+        : base_matrix<T>(other.rows, other.cols) {
         *this = std::move(other);
     }
 
@@ -52,18 +61,34 @@ struct matrix : base_matrix {
     }
 
     matrix(matrix& other)
-        : base_matrix(other.rows, other.cols) {
+        : base_matrix<T>(other.rows, other.cols) {
         *this = other;
     }
 
     matrix& operator=(matrix& other) {
         if (this->cols * this->rows != other.cols * other.rows) {
             delete[] this->data;
-            this->data = new number[cols * rows];
+            this->data = new T[other.cols * other.rows];
             this->cols = other.cols;
             this->rows = other.cols;
         }
-        memcpy(this->data, other.data, rows * cols * sizeof(number));
+        memcpy(this->data, other.data, other.rows * other.cols * sizeof(T));
+        return *this;
+    }
+
+    matrix(cuda_matrix<T>& other)
+        : base_matrix<T>(other.rows, other.cols) {
+        *this = other;
+    }
+
+    matrix& operator=(cuda_matrix<T>& other) {
+        if (this->cols * this->rows != other.cols * other.rows || this->data == nullptr) {
+            free(this->data);
+            this->data = static_cast<T*>(malloc(sizeof(T) * other.cols * other.rows));
+            this->cols = other.cols;
+            this->rows = other.rows;
+        }
+        cudaErr(cudaMemcpy(this->data, other.data, sizeof(T) * other.cols * other.rows, cudaMemcpyDeviceToHost));
         return *this;
     }
 
@@ -73,11 +98,13 @@ struct matrix : base_matrix {
     }
 
     // returns a vector which does not deallocate it's data, since it's owned by this matrix
-    vector<number> operator[](idx index) {
-        return vector<number>(&(this->data[index * cols]), &(this->data[index * cols + cols]));
+    vector<T> operator[](idx index) {
+        assert(index < this->rows);
+        return vector<T>(&(this->data[index * this->cols]), &(this->data[index * this->cols + this->cols]));
     }
-    vector<number> operator[](idx index) const {
-        return vector<number>(&(this->data[index * cols]), &(this->data[index * cols + cols]));
+    vector<T> operator[](idx index) const {
+        assert(index < this->rows);
+        return vector<T>(&(this->data[index * this->cols]), &(this->data[index * this->cols + this->cols]));
     }
 
     void print() {
@@ -90,26 +117,28 @@ struct matrix : base_matrix {
     }
 };
 
-void inline _printd(matrix& mat, const char* msg) {
+template <typename T>
+void inline _printd(matrix<T>& mat, const char* msg) {
     puts(msg);
     mat.print();
 }
 
-struct cuda_matrix : base_matrix {
+template <typename T>
+struct cuda_matrix : base_matrix<T> {
 
     // sized constructor
     cuda_matrix(idx _rows, idx _cols)
-        : base_matrix(_rows, _cols) {
-        cudaErr(cudaMalloc(&this->data, sizeof(number) * _cols * _rows));
+        : base_matrix<T>(_rows, _cols) {
+        cudaErr(cudaMalloc(&this->data, sizeof(T) * _cols * _rows));
     }
     // move constructor
-    cuda_matrix(matrix&& other)
-        : base_matrix(other.rows, other.cols) {
+    cuda_matrix(matrix<T>&& other)
+        : base_matrix<T>(other.rows, other.cols) {
         *this = std::move(other);
     }
 
     // move assignment
-    cuda_matrix& operator=(matrix&& other) {
+    cuda_matrix& operator=(matrix<T>&& other) {
         cudaErr(cudaFree(this->data));
         this->data = other.data;
         this->cols = other.cols;
@@ -118,19 +147,19 @@ struct cuda_matrix : base_matrix {
         return *this;
     }
 
-    cuda_matrix(matrix& other)
-        : base_matrix(other.rows, other.cols) {
+    cuda_matrix(matrix<T>& other)
+        : base_matrix<T>(other.rows, other.cols) {
         *this = other;
     }
 
-    cuda_matrix& operator=(matrix& other) {
-        if (this->cols * this->rows != other.cols * other.rows) {
+    cuda_matrix& operator=(matrix<T>& other) {
+        if (this->cols * this->rows != other.cols * other.rows || this->data == nullptr) {
             cudaErr(cudaFree(this->data));
-            cudaErr(cudaMalloc(&this->data, sizeof(number) * other.cols * other.rows));
+            cudaErr(cudaMalloc(&this->data, sizeof(T) * other.cols * other.rows));
             this->cols = other.cols;
-            this->rows = other.cols;
+            this->rows = other.rows;
         }
-        memcpy(this->data, other.data, rows * cols * sizeof(number));
+        cudaErr(cudaMemcpy(this->data, other.data, sizeof(T) * other.cols * other.rows, cudaMemcpyHostToDevice));
         return *this;
     }
 
@@ -140,11 +169,11 @@ struct cuda_matrix : base_matrix {
     }
 
     // returns a vector which does not deallocate it's data, since it's owned by this cuda_matrix
-    __device__ cuda_vector<number> operator[](idx index) {
-        return cuda_vector<number>(&(this->data[index * cols]), &(this->data[index * cols + cols]));
+    __device__ cuda_vector<T> operator[](idx index) {
+        return cuda_vector<T>(&(this->data[index * this->cols]), &(this->data[index * this->cols + this->cols]));
     }
-    __device__ cuda_vector<number> operator[](idx index) const {
-        return cuda_vector<number>(&(this->data[index * cols]), &(this->data[index * cols + cols]));
+    __device__ cuda_vector<T> operator[](idx index) const {
+        return cuda_vector<T>(&(this->data[index * this->cols]), &(this->data[index * this->cols + this->cols]));
     }
 };
 

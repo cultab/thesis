@@ -15,12 +15,12 @@ const bool DEBUG = false;
 
 namespace types {
 
-using number = double;
+using math_t = double;
 using label = int;
 using idx = size_t;
 const int PRINT_AFTER = 24;
 const int PRINT_DIGITS = 4 + PRINT_AFTER + 2;
-const number NUM_MAX = DBL_MAX;
+const math_t MATH_T_MAX = DBL_MAX;
 
 #define printd(var)                                                                                                    \
     do {                                                                                                               \
@@ -32,13 +32,13 @@ const number NUM_MAX = DBL_MAX;
         types::_printc(cond, #cond);                                                                                     \
     } while (0)
 
-const number epsilon = DBL_EPSILON;
+const math_t epsilon = DBL_EPSILON;
 // const f64 epsilon = 0.001;
 
 void _printd(const char* fmt, bool cond);
-void _printd(const char* fmt, number var);
+void _printd(const char* fmt, math_t var);
 
-void inline _printd(number var, const char* msg) {
+void inline _printd(math_t var, const char* msg) {
     if constexpr (DEBUG) {
         puts(msg);
         printf(":\t%*.*lf\n", PRINT_DIGITS, PRINT_AFTER, var);

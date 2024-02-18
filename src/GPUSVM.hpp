@@ -1,6 +1,6 @@
 #include <iterator>
-#ifndef SVM_HPP
-#define SVM_HPP 1
+#ifndef GPUSVM_HPP
+#define GPUSVM_HPP 1
 
 #include <cmath>
 #include <iostream>
@@ -101,22 +101,22 @@ class GPUSVM {
      * | y_i |   a_i   |
      * |     | 0< a <C |
      */
-    enum kind { UP = 1, LO = 0, BOTH = 2 };
+    enum idx_kind { UP = 1, LOW = 0, BOTH = 2 };
 
   public:
     cuda_matrix<math_t> x;
     cuda_vector<label> y;
     vector<math_t> w;
-    Kernel_t kernel_type;
     cuda_vector<math_t> a;
     cuda_vector<math_t> error;
 
-    cuda_vector<kind> indices;
+    cuda_vector<idx_kind> indices;
     math_t b;
 
     math_t C;
     math_t tol;      // KKT tolerance
     math_t diff_tol; // alpha diff tolerance ?
+    Kernel_t kernel_type;
 
     // cudaLaunchCooperativeKernel
     //  TODO: maybe initialize in host, transfer to cuda_vectors, then train?
@@ -124,14 +124,14 @@ class GPUSVM {
         : x(_x),
           y(_y),
           w(shape.num_features),
-          kernel_type(_kernel_type),
           a(shape.num_samples),
           error(shape.num_samples),
           indices(shape.num_samples),
           b(0),
           C(params.cost),
           tol(params.tolerance),
-          diff_tol(params.diff_tolerance) {
+          diff_tol(params.diff_tolerance),
+          kernel_type(_kernel_type) {
         // w.set(1); // WARN: watch out
         w.set(types::epsilon);
     }
@@ -181,6 +181,16 @@ class GPUSVM {
         cudaErr(cudaMemcpy(this, dev_this, sizeof(GPUSVM), cudaMemcpyDeviceToHost));
     }
 
+    // device globals
+    idx dev_lo = 0;
+    idx dev_up = 0;
+    math_t dev_a_up;
+    math_t dev_a_lo;
+    math_t dev_a_up_new;
+    math_t dev_a_lo_new;
+    math_t dev_b_lo = 1;
+    math_t dev_b_up = -1;
+
     __device__ void train_device() {
         a.set(0);
 
@@ -188,10 +198,19 @@ class GPUSVM {
         unsigned int stride = blockDim.x * gridDim.x;
         grid_group blocks = this_grid();
         thread_block threads = this_thread_block();
+        // IDEA: block locals ?
 
-        if (tid == 0) {
-            printf("[%d]: here!\n", tid);
-        }
+        // thread locals
+        math_t K_lo_lo;
+        math_t K_up_up;
+        math_t K_lo_up;
+        math_t eta;
+        math_t a_lo_new;
+        math_t a_up_new;
+        math_t a_lo;
+        math_t a_up;
+        idx lo;
+        idx up;
 
         // initialize indices
         for (idx i = tid; i < indices.cols; i += stride) { // :^)
@@ -202,7 +221,7 @@ class GPUSVM {
             if ((y[i] == 1 && a[i] == 0) || (y[i] == -1 && a[i] == C)) {
                 indices[i] = UP;
             } else {
-                indices[i] = LO;
+                indices[i] = LOW;
             }
             // printf("[%d]: indices[%lu] = %s\n", tid, i, indices[i] == UP ? "UP" : indices[i] == LO ? "LO" : "BOTH");
         }
@@ -214,149 +233,296 @@ class GPUSVM {
         }
         blocks.sync();
 
-        // pick b up and lo for the first time:
+        // pick b_up and _lo for the first time:
         bool picked_lo = false;
         bool picked_up = false;
-        idx lo = 0;
-        idx up = 0;
-        math_t b_lo = 1;
-        math_t b_up = -1;
-        for (int i = 0; i < y.cols; i++) {
-            if (y[i] < 0) {
-                if (!picked_lo) {
-                    lo = i;
-                    picked_lo = true;
-                    if (picked_up) {
-                        break;
+        if (tid == 0) {
+            for (idx i = 0; i < y.cols; i += 1) {
+                if (y[i] < 0) {
+                    if (!picked_lo) {
+                        lo = i;
+                        picked_lo = true;
+                        if (picked_up) {
+                            break;
+                        }
                     }
-                }
-            } else {
-                if (!picked_up) {
-                    up = i;
-                    if (picked_lo) {
-                        break;
+                } else {
+                    if (!picked_up) {
+                        up = i;
+                        picked_up = true;
+                        if (picked_lo) {
+                            break;
+                        }
                     }
                 }
             }
+
+            K_lo_lo = Kernel(x[lo], x[lo]);
+            K_up_up = Kernel(x[up], x[up]);
+            K_lo_up = Kernel(x[lo], x[up]);
+            eta = K_lo_lo + K_up_up - 2 * K_lo_up;
+            math_t a_new = 2 / eta;
+            // write to global memory
+            dev_a_up_new = a_new;
+            dev_a_lo_new = a_new;
+            a[lo] = a_new;
+            a[up] = a_new;
+            dev_lo = lo;
+            dev_up = up;
+
+            // recalculate indices for lo and up
+            indices[up] = compute_type_for_index(up);
+            indices[lo] = compute_type_for_index(lo);
         }
-
-        math_t K_lo_lo = Kernel(x[lo], x[lo]);
-        math_t K_up_up = Kernel(x[up], x[up]);
-        math_t K_lo_up = Kernel(x[lo], x[up]);
-        math_t eta = K_lo_lo + K_up_up - 2 * K_lo_up;
-        math_t a_up_new = 2 / eta;
-        math_t a_lo_new = a_up_new;
-
-        a[lo] = a_lo_new;
-        a[up] = a_up_new;
-
-        // recalculate indices for lo and up
-        if (0 < a[up] && a[up] < C) {
-            indices[up] = BOTH;
-        } else if ((y[up] == 1 && a[up] == 0) || (y[up] == -1 && a[up] == C)) {
-            indices[up] = UP;
-        } else {
-            indices[up] = LO;
-        }
-
-        if (0 < a[lo] && a[lo] < C) {
-            indices[lo] = BOTH;
-        } else if ((y[lo] == 1 && a[lo] == 0) || (y[lo] == -1 && a[lo] == C)) {
-            indices[lo] = UP;
-        } else {
-            indices[lo] = LO;
-        }
+        blocks.sync();
+        // read from global
+        a_lo_new = dev_a_lo_new;
+        a_up_new = dev_a_up_new;
+        lo = dev_lo;
+        up = dev_up;
 
         for (idx i = tid; i < error.cols; i += stride) {
             error[i] = error[i] - a_lo_new * Kernel(x[lo], x[i]) + a_up_new * Kernel(x[up], x[i]);
         }
 
-        if (tid == 0) {
-            printf("[%d]: %s!\n", tid, b_lo > b_up + 2 * tol ? "true" : "false");
-            printf("[%d]: b_lo = %f, b_up = %f!\n", tid, b_lo, b_up);
-            printf("[%d]: lo = %lu, up = %lu!\n", tid, lo, up);
-            // for (idx i = tid; i < a.cols; i += stride) {
-            //     printf("a[%lu] = %f\n", i, a[i]);
+        // int ITERS = 0;
+        // int nochange = 0;
+        while (dev_b_lo > dev_b_up + 2 * tol) {
+            // if (ITERS > 1000) {
+            //     printf("Iteration limit reached!\n");
+            //     break;
             // }
-            // for (idx i = tid; i < error.cols; i += stride) {
-            //     printf("error[%lu] = %f\n", i, error[i]);
+            // if (nochange > 10) {
+            //     printf("No changes to alphas!\n");
+            //     break;
             // }
-            // for (idx i = tid; i < indices.cols; i += stride) {
-            //     printf("[%d]: indices[%lu] = %s\n", tid, i, indices[i] == UP ? "UP" : indices[i] == LO ? "LO" : "BOTH");
+            // ITERS++;
+
+            if (tid == 0) {
+                math_t sign = y[up] * y[lo];
+
+                K_lo_lo = Kernel(x[lo], x[lo]);
+                K_up_up = Kernel(x[up], x[up]);
+                K_lo_up = Kernel(x[lo], x[up]);
+
+                eta = K_lo_lo + K_up_up - 2 * K_lo_up;
+
+                // update a_I_up , a_I_lo
+
+                a_up = a[up];
+                a_lo = a[lo];
+
+                a_up_new = a_up + (y[up] * (error[lo] - error[up])) / eta + types::epsilon;
+
+                // clip new a_up
+                if (a_up_new > C) {
+                    a_up_new = C;
+                } else if (a_up_new < 0) {
+                    a_up_new = 0;
+                }
+
+                a_lo_new = a_lo + sign * (a_up - a_up_new);
+                // write to global
+                dev_a_up_new = a_up_new;
+                dev_a_lo_new = a_lo_new;
+            }
+            blocks.sync();
+            a_lo_new = dev_a_lo_new;
+            a_up_new = dev_a_up_new;
+            a_lo = dev_a_lo;
+            a_up = dev_a_up;
+
+            // if (fabs(a_up_new - a_up) < diff_tol) {
+            //     printf("Change = %f num = %d\n", fabs(a_up_new - a_up), nochange);
+            //     nochange++;
+            // } else {
+            //     nochange = 0;
             // }
-        }
-
-        while (b_lo > b_up + 2 * tol) {
-
-            // obtain kIlo,Ilo, kIup,Iup, kIup,Ilo
-
-            math_t sign = y[up] * y[lo];
-
-            K_lo_lo = Kernel(x[lo], x[lo]);
-            K_up_up = Kernel(x[up], x[up]);
-            K_lo_up = Kernel(x[lo], x[up]);
-
-            eta = K_lo_lo + K_up_up - 2 * K_lo_up;
-
-            // update a_I_up , a_I_lo
-
-            math_t a_up = a[up];
-            math_t a_lo = a[lo];
-
-            a_up_new = a_up + (y[up] * (error[lo] - error[up])) / eta + types::epsilon;
-
-            a_lo_new = a_lo + sign * (a_up - a_up_new);
 
             // recalculate error
             for (idx i = tid; i < error.cols; i += stride) {
                 error[i] = error[i] + (a_lo_new - a_lo) * y[lo] * Kernel(x[lo], x[i]) +
                            (a_up_new - a_up) * y[up] * Kernel(x[up], x[i]);
             }
+            blocks.sync();
 
-            // set new alphas
             if (tid == 0) {
+                // set new alphas
                 a[lo] = a_lo_new;
                 a[up] = a_up_new;
+                // recompute index type for up and low
+                indices[lo] = compute_type_for_index(lo);
+                indices[up] = compute_type_for_index(up);
             }
+            blocks.sync();
 
-            if (0 < a[up] && a[up] < C) {
-                indices[up] = BOTH;
-            } else if ((y[up] == 1 && a[up] == 0) || (y[up] == -1 && a[up] == C)) {
-                indices[up] = UP;
-            } else {
-                indices[up] = LO;
-            }
-            if (0 < a[lo] && a[lo] < C) {
-                indices[lo] = BOTH;
-            } else if ((y[lo] == 1 && a[lo] == 0) || (y[lo] == -1 && a[lo] == C)) {
-                indices[lo] = UP;
-            } else {
-                indices[lo] = LO;
-            }
-
-            printf("BEFORE\n");
             std::tie(up, lo) = compute_b_up_lo();
-            printf("AFTER\n");
-            b_lo = error[lo];
-            b_up = error[up];
+
             if (tid == 0) {
+                dev_b_lo = error[lo];
+                dev_b_up = error[up];
                 // for (idx i = tid; i < a.cols; i += stride) {
                 //     printf("a[%lu] = %f\n", i, a[i]);
                 // }
-                for (idx i = tid; i < error.cols; i += stride) {
-                    printf("error[%lu] = %f\n", i, error[i]);
-                }
+                // for (idx i = tid; i < error.cols; i += stride) {
+                //     printf("error[%lu] = %f\n", i, error[i]);
+                // }
                 // for (idx i = tid; i < indices.cols; i += stride) {
                 //     printf("[%d]: indices[%lu] = %s\n", tid, i,
                 //            indices[i] == UP   ? "UP"
                 //            : indices[i] == LO ? "LO"
                 //                               : "BOTH");
                 // }
-                printf("[%d]: %s!\n", tid, b_lo > b_up + 2 * tol ? "true" : "false");
-                printf("[%d]: b_lo = %f, b_up = %f!\n", tid, b_lo, b_up);
-                printf("[%d]: lo = %lu, up = %lu!\n", tid, lo, up);
+                printf("[%d]: b_lo[%lu] = %f, b_up[%lu] = %f!\t", tid, lo, dev_b_lo, up, dev_b_up);
+                printf("Gap = %f\n", dev_b_lo - (dev_b_up + 2 * tol));
             }
         }
+    }
+
+    __device__ void compute_index_types() {
+        unsigned int tid = blockDim.x * blockIdx.x + threadIdx.x;
+        unsigned int stride = blockDim.x * gridDim.x;
+        grid_group blocks = this_grid();
+        thread_block threads = this_thread_block();
+
+        for (idx i = tid; i < indices.cols; i += stride) {
+            indices[i] = compute_type_for_index(i);
+        }
+    }
+
+    __device__ idx_kind compute_type_for_index(idx i) {
+        if (0 < a[i] && a[i] < C) {
+            return BOTH;
+        } else if ((y[i] == 1 && a[i] == 0) || (y[i] == -1 && a[i] == C)) {
+            return UP;
+        } else {
+            return LOW;
+        }
+    }
+
+    // expects sdata, sindx of size blockDim.x * 2
+    //         ddata, dindx of size gridDim.x * 2
+    //         must have blockDim.x > gridDim.x
+    __device__ std::tuple<idx,idx> argMin(math_t* sdata, idx* sindx, math_t* ddata, idx* dindx) {
+        unsigned int tid = blockDim.x * blockIdx.x + threadIdx.x;
+        unsigned int stride = blockDim.x * gridDim.x;
+        thread_block threads = this_thread_block();
+        grid_group blocks = this_grid();
+
+        __shared__ math_t block_max;
+        __shared__ idx block_max_i;
+        __shared__ math_t block_min;
+        __shared__ idx block_min_i;
+        // init block locals
+        if (threadIdx.x == 0) {
+            block_max = -types::MATH_T_MAX;
+            block_max_i = 0;
+            block_min = +types::MATH_T_MAX;
+            block_min_i = 0;
+        }
+
+        math_t cur_max;
+        math_t cur_min;
+        idx min_i = tid;
+        idx max_i = tid;
+        if (tid < a.cols) {
+            cur_min = a[tid];
+            // thread local arg min|max
+            for (idx i = tid + stride; i < a.cols; i += stride) {
+                // TODO: Take into account indices up, low and both
+                auto kind = indices[i];
+                auto tmp = a[i]; // save to local, so it's accessed only once
+                if (kind == UP || kind == BOTH) {
+                    if (tmp < cur_min) {
+                        cur_min = tmp;
+                        min_i = i;
+                    }
+                }
+                if (kind == LOW || kind == BOTH) {
+                    if (tmp > cur_min) {
+                        cur_max = tmp;
+                        max_i = i;
+                    }
+                }
+            }
+        } else {
+            cur_max = -types::MATH_T_MAX;
+            cur_min = +types::MATH_T_MAX;
+        }
+
+        // load into to block shared memory
+        sdata[threadIdx.x] = cur_min;
+        sindx[threadIdx.x] = min_i;
+        sdata[threadIdx.x + blockDim.x] = cur_max;
+        sindx[threadIdx.x + blockDim.x] = max_i;
+        threads.sync();
+
+        // block reduce into sdata[0] and sindx[0]
+        for (idx offset = 1; offset < blockDim.x; offset *= 2) {
+            idx index = 2 * offset * threadIdx.x;
+
+            if (index < blockDim.x) {
+                // min
+                if (sdata[index + offset] < sdata[index]) {
+                    sdata[index] = sdata[index + offset];
+                    sindx[index] = sindx[index + offset];
+                }
+                // max (stored offset by blockDim.x)
+                if (sdata[blockDim.x + index + offset] > sdata[blockDim.x + index]) {
+                    sdata[blockDim.x + index] = sdata[blockDim.x + index + offset];
+                    sindx[blockDim.x + index] = sindx[blockDim.x + index + offset];
+                }
+            }
+        }
+
+        threads.sync();
+        // write block result to device global
+        if (threadIdx.x == 0) {
+            ddata[blockIdx.x] = sdata[0];
+            dindx[blockIdx.x] = sindx[0];
+            ddata[blockDim.x + blockIdx.x] = sdata[blockDim.x + 0];
+            dindx[blockDim.x + blockIdx.x] = sindx[blockDim.x + 0];
+        }
+
+        blocks.sync();
+
+        // perform reduction of block results,
+        // like above but for block results :^)
+        if (blockIdx.x == 0) {
+            // copy device globals to block shared memory
+            if (threadIdx.x < gridDim.x) {
+                sdata[threadIdx.x] = ddata[threadIdx.x];
+                sindx[threadIdx.x] = dindx[threadIdx.x];
+                sdata[blockDim.x + threadIdx.x] = ddata[blockDim.x + threadIdx.x];
+                sindx[blockDim.x + threadIdx.x] = dindx[blockDim.x + threadIdx.x];
+            }
+            threads.sync();
+            for (idx offset = 1; offset < blockDim.x; offset *= 2) {
+                idx index = 2 * offset * threadIdx.x;
+
+                if (index < blockDim.x) {
+                    if (sdata[index + offset] < sdata[index]) {
+                        sdata[index] = sdata[index + offset];
+                        sindx[index] = sindx[index + offset];
+                    }
+                    if (sdata[blockDim.x + index + offset] > sdata[blockDim.x + index]) {
+                        sdata[blockDim.x + index] = sdata[blockDim.x + index + offset];
+                        sindx[blockDim.x + index] = sindx[blockDim.x + index + offset];
+                    }
+                }
+            }
+            threads.sync();
+        }
+
+		// write to global memory
+        if (blockIdx.x + threadIdx.x == 0) { // will the real tid 0 plz stand up
+            dindx[0] = sindx[0];
+            dindx[1] = sindx[blockDim.x + 0]
+        }
+
+		blocks.sync();
+
+        return dindx[0], dindx[1];
     }
 
     // for 1 thread, sanity check of argmin/max
@@ -373,26 +539,26 @@ class GPUSVM {
                 if (error[i] < b_up) {
                     b_up = error[i];
                     i_up = i;
-                    printf("new up %f\n", b_up);
+                    // printf("new up %f\n", b_up);
                 }
                 if (error[i] > b_lo) {
                     b_lo = error[i];
                     i_lo = i;
-                    printf("new lo %f\n", b_lo);
+                    // printf("new lo %f\n", b_lo);
                 }
             } else if (indices[i] == UP) {
                 // printf("[%d]: err[%lu]=%f b_up=%f\n", tid, i, error[i], b_up);
                 if (error[i] < b_up) {
                     b_up = error[i];
                     i_up = i;
-                    printf("new up %f\n", b_up);
+                    // printf("new up %f\n", b_up);
                 }
             } else {
                 // printf("[%d]: err[%lu]=%f b_lo=%f\n", tid, i, error[i], b_lo);
                 if (error[i] > b_lo) {
                     b_lo = error[i];
                     i_lo = i;
-                    printf("new lo %f\n", b_lo);
+                    // printf("new lo %f\n", b_lo);
                 }
             }
         }

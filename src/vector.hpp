@@ -9,8 +9,8 @@
 #include <__clang_cuda_builtin_vars.h>
 #include <__clang_cuda_device_functions.h>
 #include <__clang_cuda_intrinsics.h>
-#include <__clang_cuda_runtime_wrapper.h>
 #include <__clang_cuda_libdevice_declares.h>
+#include <__clang_cuda_runtime_wrapper.h>
 #endif
 
 #include "cuda_helpers.h"
@@ -20,7 +20,8 @@ namespace cg = cooperative_groups;
 
 using cg::grid_group;
 using cg::this_grid;
-using cg::thread_group;
+using cg::this_thread_block;
+using cg::thread_block;
 
 namespace types {
 
@@ -51,6 +52,17 @@ struct base_vector {
           view(false) {}
 
     __host__ __device__ T& operator[](idx i) {
+        if (i >= this->cols) {
+            printf("i:%lu, cols %lu\n", i, this->cols);
+        }
+        assert(i < this->cols);
+        return this->data[i];
+    }
+
+    __host__ __device__ T& operator[](idx i) const {
+        if (i >= this->cols) {
+            printf("i:%lu, cols %lu\n", i, this->cols);
+        }
         assert(i < this->cols);
         return this->data[i];
     }
@@ -77,7 +89,7 @@ struct base_vector {
             this->data[i] = func(this->data[i]);
         }
     }
-    __host__ __device__ void print(const char* msg);
+    __host__ __device__ void print(const char* msg) const;
 };
 
 template <typename T = math_t>
@@ -224,6 +236,7 @@ struct cuda_vector : public base_vector<T> {
 #endif
     }
 
+
     // // reduce the array to a single value stored at  TODO: which index?
     // __device__ void reduce(std::function<T(idx)> func) {
     //     unsigned int tid = blockDim.x * blockIdx.x + threadIdx.x;
@@ -338,7 +351,6 @@ struct cuda_vector : public base_vector<T> {
     //     }
     // }
 
-
     __device__ void set(T value) {
         unsigned int tid = blockDim.x * blockIdx.x + threadIdx.x;
         unsigned int stride = blockDim.x * gridDim.x;
@@ -361,14 +373,14 @@ typedef math_t (*Kernel)(base_vector<math_t>, base_vector<math_t>);
 // using Kernel = std::function<number(vector<number>, vector<number>)>;
 
 template <>
-inline void base_vector<int>::print(const char* msg) {
+inline void base_vector<int>::print(const char* msg) const {
     for (idx i = 0; i < this->cols; i++) {
         printf("%s[%zu]: %*d\n", msg, i, PRINT_DIGITS, this->data[i]);
     }
 }
 
 template <>
-inline void base_vector<double>::print(const char* msg) {
+inline void base_vector<double>::print(const char* msg) const {
     for (idx i = 0; i < this->cols; i++) {
         printf("%s[%zu]: %*.*f\n", msg, i, PRINT_DIGITS, PRINT_AFTER, this->data[i]);
     }

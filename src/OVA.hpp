@@ -77,20 +77,19 @@ class OVA {
             // if (!(i % 10 == 0)) {
             //     continue;
             // }
-            puts("==========");
-            printf("%zu\n", i);
             vector<math_t> example = data.X[i];
 
             auto [pred, score] = this->predict(example);
-
-            printf("actual: %s predicted: %s\n", data.classes[data.Y[i]].c_str(), data.classes[pred].c_str());
-            printf("actual: %d predicted: %d\n", data.Y[i], pred);
-            printf("score: %f\n", score);
+            // puts("==========");
+            // printf("%zu\n", i);
+            // printf("actual: %s predicted: %s\n", data.classes[data.Y[i]].c_str(), data.classes[pred].c_str());
+            // printf("actual: %d predicted: %d\n", data.Y[i], pred);
+            // printf("score: %f\n", score);
             if (pred == data.Y[i]) {
                 // puts("CORRECT");
                 correct++;
             } else {
-                puts("WRONG");
+                // puts("WRONG");
                 incorrect++;
             }
         }

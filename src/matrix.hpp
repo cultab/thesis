@@ -84,7 +84,7 @@ struct matrix : public base_matrix<T> {
     matrix& operator=(cuda_matrix<T>& other) {
         if (this->cols * this->rows != other.cols * other.rows || this->data == nullptr) {
             free(this->data);
-            this->data = static_cast<T*>(malloc(sizeof(T) * other.cols * other.rows));
+            this->data = new T[other.cols * other.rows];
             this->cols = other.cols;
             this->rows = other.rows;
         }

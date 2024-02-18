@@ -1,8 +1,8 @@
-#ifndef SVM_HPP
-#define SVM_HPP 1
+#ifndef SMO_HPP
+#define SMO_HPP 1
 
-#include <iostream>
 #include <cmath>
+#include <iostream>
 
 #include "SVM_common.hpp"
 #include "dataset.hpp"
@@ -13,36 +13,76 @@
 #define max(a, b) a > b ? a : b
 #define min(a, b) a < b ? a : b
 
-namespace SVM {
-
 using types::idx; // WARN: watch out for <string.h> or <cstring>
 using types::Kernel;
 using types::label;
+using types::math_t;
 using types::matrix;
-using types::number;
 using types::vector;
 
+namespace SVM {
+
+math_t Linear_Kernel(const vector<math_t>& a, const vector<math_t>& b) {
+    math_t res = 0;
+    for (idx k = 0; k < a.cols; k++) {
+        res += a[k] * b[k];
+    }
+    return res;
+}
+
+// for xor -> degree = 3, gamma = 0
+math_t Polynomial_Kernel(const vector<math_t>& a, const vector<math_t>& b) {
+    math_t gamma = 0;
+    math_t degree = 3;
+    math_t res = 0;
+    for (idx k = 0; k < a.cols; k++) {
+        res += a[k] * b[k];
+    }
+    res = gamma + pow(res, degree);
+    // printf("%f\n", res);
+    return res;
+}
+
+// TODO: this don't work :|
+math_t RBF_Kernel(const vector<math_t>& a, const vector<math_t>& b) {
+    math_t gamma = 0.01;
+    math_t res = 0;
+    for (idx k = 0; k < a.cols; k++) {
+        res += pow(a[k] - b[k], 2); // squared euclidean distance -> aka sum of square of difference
+    }
+
+    // printf("inres = %f\n", res);
+    res *= -gamma;
+    // printf("inres = %f\n", res);
+    res = exp(res);
+    // printf("inres = %f\n", res);
+
+    a.print("a");
+    b.print("a");
+    printf("res = %f\n", res);
+    return res;
+}
 class SMO {
 
   public:
-    matrix& x;
+    matrix<math_t>& x;
     vector<label> y;
-    vector<number> w;
-    number b;
-    Kernel K;
-    vector<number> a;
-    vector<number> error;
+    vector<math_t> w;
+    math_t b;
+    Kernel_t kernel_type;
+    vector<math_t> a;
+    vector<math_t> error;
 
-    number C;
-    number tol;      // KKT tolerance
-    number diff_tol; // alpha diff tolerance ?
+    math_t C;
+    math_t tol;      // KKT tolerance
+    math_t diff_tol; // alpha diff tolerance ?
 
-    SMO(dataset_shape& shape, matrix& _x, vector<label>& _y, hyperparams params, Kernel kernel)
+    SMO(dataset_shape& shape, matrix<math_t>& _x, vector<label>& _y, hyperparams params, Kernel_t kernel)
         : x(_x),
           y(std::move(_y)),
           w(shape.num_features),
           b(0),
-          K(kernel),
+          kernel_type(kernel),
           a(shape.num_samples),
           error(shape.num_samples),
           C(params.cost),
@@ -66,6 +106,24 @@ class SMO {
         }
     }
 
+    // TODO: caching
+    math_t Kernel(const vector<math_t>& v, const vector<math_t>& u) {
+        switch (kernel_type) {
+        case LINEAR:
+            return Linear_Kernel(v, u);
+            break;
+        case POLY:
+            return Polynomial_Kernel(v, u);
+            break;
+        case RBF:
+            return RBF_Kernel(v, u);
+            break;
+        default:
+            printf("UNIMPLEMENTED KERNEL TYPE!\n");
+            return 0;
+        }
+    }
+
     void train() {
         printf("Training");
         int numChanged = 0;
@@ -79,16 +137,16 @@ class SMO {
                 std::flush(std::cout);
             }
             if (false && epochs && epochs % 1000 == 0) {
-                number avg_error = 0;
+                math_t avg_error = 0;
                 for (auto e : error) {
                     avg_error += e;
                 }
-                avg_error = avg_error / static_cast<number>(error.cols);
+                avg_error = avg_error / static_cast<math_t>(error.cols);
 
                 printf("\nContinue training? [Y/n]\n");
                 printf("Already trained for %d epochs.\n", epochs);
                 printf("Average error on training set: %f\n", avg_error);
-                printd(w);
+                // printd(w);
                 int c = getchar();
                 if (c == 'n') {
                     puts("Quit training!");
@@ -136,9 +194,9 @@ class SMO {
         // printf("examine example %zu\n", i2);
 
         // lookup error E2 for i_2 in error cache
-        number E2 = error[i2];
+        math_t E2 = error[i2];
 
-        number r2 = E2 * y[i2];
+        math_t r2 = E2 * y[i2];
 
         // if the error is within tolerance and the a is outside of (0, C)
         // don't change anything for this i_2
@@ -161,7 +219,6 @@ class SMO {
                 }
             }
 
-            // TODO: cuda friendly random function
             // in the following 2 scopes
             // iters makes sure we go over all i_1
             // i_1 is the current i_1, starting from a random one, increasing until starting_i_1 - 1
@@ -186,7 +243,6 @@ class SMO {
                 } while (i1 = (i1 + 1) % a.cols, iters++, iters < a.cols);
                 // printf("%d\n", iters);
                 // printf("%d\n", i1);
-                // exit(0);
             }
 
             {
@@ -206,7 +262,7 @@ class SMO {
 
         // printf("%zu\n", i2);
         // puts("    within tol");
-        // // if ((r2 < -tol && a[i2] < C) || (r2 > tol && a[i2] > 0)) {
+        // if ((r2 < -tol && a[i2] < C) || (r2 > tol && a[i2] > 0))
         // printd(r2);
         // printd(-a[i2]);
         // printd(tol);
@@ -219,8 +275,8 @@ class SMO {
     int takeStep(idx i1, idx i2) {
         // getchar();
         // printf("    takeStep %zu %zu\n", i1, i2);
-        number sign = y[i1] * y[i2];
-        number L = 0, H = 0;
+        math_t sign = y[i1] * y[i2];
+        math_t L = 0, H = 0;
 
         // find low and high
         if (y[i1] != y[i2]) {
@@ -242,15 +298,15 @@ class SMO {
         }
 
         // second derivative (f'')
-        number eta = 2 * K(x[i1], x[i2]) - K(x[i1], x[i1]) - K(x[i2], x[i2]);
+        math_t eta = 2 * Kernel(x[i1], x[i2]) - Kernel(x[i1], x[i1]) - Kernel(x[i2], x[i2]);
 
         // printd(eta);
-        number a_1 = 0, a_2 = 0;
+        math_t a_1 = 0, a_2 = 0;
         if (eta < 0) { // if ("under usual circumstances") eta is negative
             // puts("      by error");
             // error on training examples i_1 and i_2
-            number E1 = error[i1];
-            number E2 = error[i2];
+            math_t E1 = error[i1];
+            math_t E2 = error[i2];
             // printd(E1);
             // printd(E2);
 
@@ -285,6 +341,7 @@ class SMO {
 
         // if the difference is small, don't bother
         if (fabs(a[i1] - a_1) < diff_tol) {
+            // puts("small diff");
             return 0;
         }
 
@@ -311,7 +368,7 @@ class SMO {
         return 1;
     }
 
-    idx second_choice_heuristic(number E2) {
+    idx second_choice_heuristic(math_t E2) {
         // Once a first Lagrange multiplier is chosen, SMO chooses the second Lagrange
         // multiplier to maximize the size of the step taken during joint optimization.
         // Evaluating the kernel function k is time consuming, so SMO approximates the step size
@@ -321,10 +378,10 @@ class SMO {
         // chooses an example with minimum error E2. If E1 is negative, SMO chooses an
         // example with maximum error E2
         idx i1 = 0;
-        number E1 = error[0];
+        math_t E1 = error[0];
 
-        number min = E1;
-        number max = E1;
+        math_t min = E1;
+        math_t max = E1;
         for (idx i = 1; i < a.cols; i++) {
             if (E2 >= 0) {
                 // return idx of minimum error
@@ -348,14 +405,14 @@ class SMO {
         return i1;
     }
 
-    number predict_on(idx i) {
+    math_t predict_on(idx i) {
         // printf("      predict on %zu\n", i);
-        return K(w, x[i]) + b;
+        return Kernel(w, x[i]) + b;
     }
 
-    number predict(vector<number>& sample) {
+    math_t predict(vector<math_t>& sample) {
         // printf("      predict on %zu\n", i);
-        return K(w, sample) + b;
+        return Kernel(w, sample) + b;
     }
 
     void compute_w() {
@@ -367,12 +424,12 @@ class SMO {
         }
     }
 
-    number compute_b() {
-        number min_pos = DBL_MAX;
-        number max_neg = -DBL_MAX;
+    math_t compute_b() {
+        math_t min_pos = DBL_MAX;
+        math_t max_neg = -DBL_MAX;
         for (idx i = 0; i < x.rows; i++) {
-            number tmp_p = 0;
-            number tmp_n = 0;
+            math_t tmp_p = 0;
+            math_t tmp_n = 0;
             for (idx k = 0; k < w.cols; k++) {
                 if (y[i] == 1) { // if positive class label
                     tmp_p += w[k] * x[i][k];
@@ -401,28 +458,29 @@ class SMO {
     //           - y2 * a2 * v2
     //           + Wconst
     // without loss of generality let the 2 multipliers be a1 and a2
-    number eval_objective_func_at(idx i1, idx i2, number a2) {
+    math_t eval_objective_func_at(idx i1, idx i2, math_t a2) {
+        // printf("i1 %lu i2 %lu\n", i1, i2);
         // v_i = \Sum_{j=3}^l y_j a_j^{old} K_ij
-        number v_1 = 0;
+        math_t v_1 = 0;
         for (idx j = 0; j < a.cols; j++) {
             if (j == i1 || j == i2) { // skip i1 and i2
                 continue;
             }
-            v_1 += y[j] * a[j] * K(x[i1], x[j]);
+            v_1 += y[j] * a[j] * Kernel(x[i1], x[j]);
         }
-        number v_2 = 0;
+        math_t v_2 = 0;
         for (idx j = 0; j < a.cols; j++) {
             if (j == i1 || j == i2) { // skip i1 and i2
                 continue;
             }
-            v_2 += y[j] * a[j] * K(x[i2], x[j]);
+            v_2 += y[j] * a[j] * Kernel(x[i2], x[j]);
         }
 
         // constant part of objective function
         // W(a) = \Sum_{i=3}^l a_i
         //      - \frac{1}{2} \Sum_{i=3}{l}\Sum_{j=3}{l} y_i y_j k(x_i, x_j) a_i a_j
         // IDEA: cache it?
-        number Wconst = 0;
+        math_t Wconst = 0;
         for (idx i = 0; i < a.cols; i++) {
             // \Sum_{i=3}^n a_i
             if (i == i1 || i == i2) { // skip i1 and i2
@@ -430,27 +488,27 @@ class SMO {
             }
             Wconst += a[i];
             // \Sum_{j=3}{l} y_i y_j k(x_i, x_j) a_i a_j
-            number inner_sum = 0;
+            math_t inner_sum = 0;
             for (idx j = 0; j < a.cols; j++) {
                 if (j == i1 || j == i2) { // skip i1 and i2
                     continue;
                 }
-                inner_sum += y[i] * y[j] * K(x[i], x[j]) * a[i] * a[j];
+                inner_sum += y[i] * y[j] * Kernel(x[i], x[j]) * a[i] * a[j];
             }
             Wconst -= inner_sum / 2;
         }
 
         // sign
-        number s = y[i1] * y[i2];
+        math_t s = y[i1] * y[i2];
         // \gamma
-        number g = a[i1] + (s * a[i2]);
+        math_t g = a[i1] + (s * a[i2]);
         // clang-format off
     return g - (s * a2) + a2
-        - (K(x[i1], x[i1]) * (g - s * a2))
+        - (Kernel(x[i1], x[i1]) * (g - s * a2))
         / 2
-        - (K(x[i2], x[i2]) * a2)
+        - (Kernel(x[i2], x[i2]) * a2)
         / 2
-        - s * K(i1, i2) * (g - s * a2) * a2
+        - s * Kernel(x[i1], x[i2]) * (g - s * a2) * a2
         - y[i1] * (g - s * a2) * v_1
         - y[i2] * a2 * v_2
         + Wconst;
@@ -469,7 +527,7 @@ class SMO {
         for (idx sample_index = 0; sample_index < indexes.cols; sample_index++) {
             // idx i = indexes[sample_index];
             idx i = sample_index;
-            number res = 0;
+            math_t res = 0;
             puts("==========");
             printf("%zu\n", i);
             auto example = x[i];
@@ -488,7 +546,7 @@ class SMO {
         }
         printd(correct);
         printd(wrong);
-        number accuracy = (correct) / static_cast<number>(correct + wrong);
+        math_t accuracy = (correct) / static_cast<math_t>(correct + wrong);
         printf("acc %lf\n", accuracy);
 
         // printf("a:   %p\n", &a);

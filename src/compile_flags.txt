@@ -4,6 +4,7 @@
 -L/usr/local/cuda/lib64
 -I/usr/local/cuda/include
 --no-cuda-version-check
+-fdeclspec
 -Wall
 -Wextra
 -Wstrict-null-sentinel

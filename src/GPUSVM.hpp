@@ -1,9 +1,9 @@
-#include <iterator>
 #ifndef GPUSVM_HPP
 #define GPUSVM_HPP 1
 
 #include <cmath>
 #include <iostream>
+#include <iterator>
 
 #include <cooperative_groups.h>
 
@@ -15,6 +15,25 @@
 
 #define max(a, b) a > b ? a : b
 #define min(a, b) a < b ? a : b
+
+#define BLOCKS 16
+#define THREADS 128
+// #ifndef __CUDA_ARCH__
+// namespace cooperative_groups {
+// typedef int grid_group;
+// typedef int thread_block;
+// class this_thread_block {
+//     void sync() {
+//         assert(("Unreachable", false));
+//     }
+// };
+// class this_grid {
+//     void sync() {
+//         assert(("Unreachable", false));
+//     }
+// };
+// } // namespace cooperative_groups
+// #endif
 
 namespace cg = cooperative_groups;
 using cg::grid_group;
@@ -53,26 +72,6 @@ __host__ __device__ math_t Polynomial_Kernel(base_vector<math_t> a, base_vector<
     return gamma + pow(res, degree);
 }
 
-__device__ static float atomicMax(double* address, double val) {
-    unsigned long long* address_as_i = (unsigned long long*)address;
-    unsigned long long old = *address_as_i, assumed;
-    do {
-        assumed = old;
-        old = ::atomicCAS(address_as_i, assumed, __double_as_longlong(::fmax(val, __longlong_as_double(assumed))));
-    } while (assumed != old);
-    return __longlong_as_double(old);
-}
-
-__device__ static float atomicMin(double* address, double val) {
-    unsigned long long* address_as_i = (unsigned long long*)address;
-    unsigned long long old = *address_as_i, assumed;
-    do {
-        assumed = old;
-        old = ::atomicCAS(address_as_i, assumed, __double_as_longlong(::fmin(val, __longlong_as_double(assumed))));
-    } while (assumed != old);
-    return __longlong_as_double(old);
-}
-
 class GPUSVM;
 __global__ static void train_CUDA_model(GPUSVM* model);
 
@@ -109,6 +108,8 @@ class GPUSVM {
     vector<math_t> w;
     cuda_vector<math_t> a;
     cuda_vector<math_t> error;
+    cuda_vector<math_t> ddata;
+    cuda_vector<idx> dindx;
 
     cuda_vector<idx_kind> indices;
     math_t b;
@@ -126,6 +127,8 @@ class GPUSVM {
           w(shape.num_features),
           a(shape.num_samples),
           error(shape.num_samples),
+          ddata(THREADS * 2),
+          dindx(THREADS * 2),
           indices(shape.num_samples),
           b(0),
           C(params.cost),
@@ -153,20 +156,23 @@ class GPUSVM {
     }
 
     void train() {
-        int dev = 0;
+        // int dev = 0;
         /// This will launch a grid that can maximally fill the GPU, on the default stream with kernel arguments
-        int numBlocksPerSm = 0;
+        // int numBlocksPerSm = 0;
         // number of threads my_kernel will be launched with
-        int numThreads = 128;
-        cudaDeviceProp deviceProp;
-        cudaGetDeviceProperties(&deviceProp, dev);
-        cudaOccupancyMaxActiveBlocksPerMultiprocessor(&numBlocksPerSm, train_CUDA_model, numThreads, 0);
-        // launch
+        // int numThreads = 128;
+        // cudaDeviceProp deviceProp;
+        // cudaGetDeviceProperties(&deviceProp, dev);
+        // cudaOccupancyMaxActiveBlocksPerMultiprocessor(&numBlocksPerSm, train_CUDA_model, numThreads, 0);
+        // dim3 dimBlock(numThreads, 1, 1);
+        // dim3 dimGrid(deviceProp.multiProcessorCount * numBlocksPerSm, 1, 1);
         GPUSVM* dev_this = nullptr;
+        math_t* dev_data;
+        idx* dev_indx;
+        // alloc
         cudaErr(cudaMalloc(&dev_this, sizeof(GPUSVM)));
+        // move struct to device
         cudaErr(cudaMemcpy(dev_this, this, sizeof(GPUSVM), cudaMemcpyHostToDevice));
-        dim3 dimBlock(numThreads, 1, 1);
-        dim3 dimGrid(deviceProp.multiProcessorCount * numBlocksPerSm, 1, 1);
         /*********************
          * Nvidia, fuck you. *
          *********************/
@@ -175,9 +181,8 @@ class GPUSVM {
         };
         Params p{dev_this};
         void* kernelArgs[] = {&p};
-        // cudaLaunchCooperativeKernel((void*)train_CUDA_model, dimGrid, dimBlock, kernelArgs);
-        cudaLaunchCooperativeKernel((void*)train_CUDA_model, 1, 1, kernelArgs);
-        cudaLastErr();
+        cudaErr(cudaLaunchCooperativeKernel((void*)train_CUDA_model, BLOCKS, THREADS, kernelArgs));
+        // cudaErr(cudaLaunchCooperativeKernel((void*)train_CUDA_model, 1, 1, kernelArgs));
         cudaErr(cudaMemcpy(this, dev_this, sizeof(GPUSVM), cudaMemcpyDeviceToHost));
     }
 
@@ -285,6 +290,7 @@ class GPUSVM {
             error[i] = error[i] - a_lo_new * Kernel(x[lo], x[i]) + a_up_new * Kernel(x[up], x[i]);
         }
 
+        blocks.sync();
         // int ITERS = 0;
         // int nochange = 0;
         while (dev_b_lo > dev_b_up + 2 * tol) {
@@ -356,7 +362,8 @@ class GPUSVM {
             }
             blocks.sync();
 
-            std::tie(up, lo) = compute_b_up_lo();
+            // std::tie(up, lo) = compute_b_up_lo();
+            std::tie(up, lo) = argMin();
 
             if (tid == 0) {
                 dev_b_lo = error[lo];
@@ -376,6 +383,7 @@ class GPUSVM {
                 printf("[%d]: b_lo[%lu] = %f, b_up[%lu] = %f!\t", tid, lo, dev_b_lo, up, dev_b_up);
                 printf("Gap = %f\n", dev_b_lo - (dev_b_up + 2 * tol));
             }
+            printf("[%d]: before\n", tid);
         }
     }
 
@@ -403,12 +411,14 @@ class GPUSVM {
     // expects sdata, sindx of size blockDim.x * 2
     //         ddata, dindx of size gridDim.x * 2
     //         must have blockDim.x > gridDim.x
-    __device__ std::tuple<idx,idx> argMin(math_t* sdata, idx* sindx, math_t* ddata, idx* dindx) {
+    __device__ std::tuple<idx, idx> argMin() {
         unsigned int tid = blockDim.x * blockIdx.x + threadIdx.x;
         unsigned int stride = blockDim.x * gridDim.x;
         thread_block threads = this_thread_block();
         grid_group blocks = this_grid();
 
+        __shared__ idx sindx[THREADS * 2];
+        __shared__ math_t sdata[THREADS * 2];
         __shared__ math_t block_max;
         __shared__ idx block_max_i;
         __shared__ math_t block_min;
@@ -514,15 +524,15 @@ class GPUSVM {
             threads.sync();
         }
 
-		// write to global memory
+        // write to global memory
         if (blockIdx.x + threadIdx.x == 0) { // will the real tid 0 plz stand up
             dindx[0] = sindx[0];
-            dindx[1] = sindx[blockDim.x + 0]
+            dindx[1] = sindx[blockDim.x + 0];
         }
 
-		blocks.sync();
+        blocks.sync();
 
-        return dindx[0], dindx[1];
+        return std::make_tuple(dindx[0], dindx[1]);
     }
 
     // for 1 thread, sanity check of argmin/max
@@ -602,3 +612,23 @@ __global__ static void train_CUDA_model(GPUSVM* model) {
 
 } // namespace SVM
 #endif
+
+// __device__ static double atomicMax(double* address, double val) {
+//     unsigned long long* address_as_i = (unsigned long long*)address;
+//     unsigned long long old = *address_as_i, assumed;
+//     do {
+//         assumed = old;
+//         old = ::atomicCAS(address_as_i, assumed, __double_as_longlong(::fmax(val, __longlong_as_double(assumed))));
+//     } while (assumed != old);
+//     return __longlong_as_double(old);
+// }
+//
+// __device__ static double atomicMin(double* address, double val) {
+//     unsigned long long* address_as_i = (unsigned long long*)address;
+//     unsigned long long old = *address_as_i, assumed;
+//     do {
+//         assumed = old;
+//         old = ::atomicCAS(address_as_i, assumed, __double_as_longlong(::fmin(val, __longlong_as_double(assumed))));
+//     } while (assumed != old);
+//     return __longlong_as_double(old);
+// }

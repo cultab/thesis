@@ -20,3 +20,7 @@
 \newpage
 
 {{< include classification.qmd >}}
+
+\newpage
+
+{{< include svm.qmd >}}

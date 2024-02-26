@@ -12,7 +12,7 @@ date: now
 date-format: dddd MMMM D, YYYY
 
 format:
-    pdf:
+    wordcount-pdf:
         # template: /home/evan/.pandoc/templates/eisvogel.latex
         # template: /home/evan/.pandoc/templates/new.latex # rec
         highlight-style: github

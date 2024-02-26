@@ -1,37 +1,38 @@
 
 # Classification {#sec:class}
 
-Classification is the process of assigning a class label to each sample of a dataset, an algorithm that classifies data is called a Classifier. It has a wide range of applications ranging from medical diagnosis [@medical] to natural language processing [@text] and building recognition [@alex] to financial fraud detection [@fraud]. As such lots of research has gone into improving classification accuracy (as well as minimizing run time)(?). This section will cover the training of classifiers, various categories of classifiers and finally various types of classifiers used today.
+Classification is the process of assigning a class label to each sample of a dataset, an algorithm that classifies data is called a Classifier. Classification has a wide range of applications ranging from medical diagnosis [@medical] to natural language processing [@text] and building recognition [@alex] to financial fraud detection [@fraud]. As such lots of research has gone into improving Classifiers. This section will cover the training of classifiers, various categories of classifiers and finally various types of classifiers used today.
 
 ## Learning Strategies(?)
 
-Classification is usually(?) split into two distinct phases, the training phase: wherein the classifier learns how to classify samples, and the prediction phase: wherein the classifier actually attempts to classify a dataset. But depending on when the training phase happens there exist multiple training strategies.
+Classification is in it's simplest form can be split into two distinct phases, the training phase: wherein the classifier learns how to classify samples, and the prediction phase: wherein the classifier actually attempts to classify distinct samples. But with more involved techniques and depending on when the training phase happens there exist multiple training strategies.
 
 ### Batch Learning {#sec:batch}
 
 In batch training, the training and prediction phases **are** distinct and the training happens all at once--- before the prediction stage.
 
-#### Training Phase
-
-The first phase is the training phase wherein the classifier will be given a dataset that is representative of the data it's meant to later classify.
+<!-- #### Training Phase -->
+<!---->
+<!-- The first phase is the training phase wherein the classifier will be given a dataset that is representative of the data it's meant to later classify. -->
+<!---->
+<!---->
+<!-- #### Prediction Phase -->
+<!---->
+<!-- The prediction phase is what happens after successful training of a classifier. The classifier is given a number of samples and assigns each a class label or a probability for each class label. -->
 
 ##### Supervised learning
 
 The datasets used in training are usually annotated with the class label of each data point.
-In supervised learning [@supervised], the dataset used in training will be annotated with the class label of each sample. In this way the classifier can learn to extract sets of features that are representative of each class by summarizing(?) the common features of samples with the same class label.
+In supervised learning [@supervised], the dataset used in training will be annotated with the class label of each sample. In this way the classifier can learn to extract sets of features that are representative of each class by summarizing the common features of samples with the same class label.
 
 ##### Unsupervised learning
 
-Techniques that can operate on unlabeled datasets exist and fall under the label of unsupervised learning [@unsupervised].
+Techniques that can operate on unlabeled datasets exist and fall under the name of unsupervised learning [@unsupervised].
 In unsupervised learning, the dataset used in training is not annotated. Unsupervised learning techniques are used when a training dataset does not exist or is prohibitively expensive, time consuming or inconvenient to annotate correctly [@annotation].
-
-#### Prediction Phase
-
-The prediction phase is what happens after successful training of a classifier. The classifier is given a number of samples and assigns each a class label or a probability for each class label.
 
 ### Online learning
 
-With online learning, as opposed to \nameref{sec:batch}, the classifier is designed to learn on $\ell + 1$ samples, where $\ell$ is the number of samples already having been used for training. In other words the classifier is given an unlabeled sample, it makes a prediction, and then the classifier is given the correct label which it uses to update it's model [@online-slides, page 20]. Online learning can be used in conjunction with either unsupervised and supervised learning. Online learning is useful when the training data is prohibitively large [@online], is generated in real time [@online-realtime] or when training has to be interleaved with prediction.
+With online learning, as opposed to \nameref{sec:batch}, the classifier is designed to learn on $\ell + 1$ samples, where $\ell$ is the number of samples already having been used for training. In other words the classifier is given an unlabeled sample, it makes a prediction, and then the classifier is given the correct label which it uses to update it's model [@online-slides, page 20]. Online learning can be used in conjunction with either unsupervised and supervised learning. Online learning is useful when the training data is prohibitively large [@online], is generated in real time [@online-realtime] or in general anytime when training has to be interleaved with prediction.
 
 ## Binary and Multiclass {#sec:bmclass}
 
@@ -142,7 +143,7 @@ P(A|B) = \frac{P(B|A)P(A)}{P(B)}
 \end{equation}
 
 
-From \ref{eq:bt} according to @zhang2004optimality
+From \ref{eq:bt} and according to @zhang2004optimality
 
 we can say that the probability that a sample $x$ with features $<x_1, x_2, ..., x_n>$ belongs in class $c$ is:
 
@@ -167,26 +168,24 @@ As such the function $f_nb(x)$ is the Naive Bayes Classifier.
 
 #### Types of NB Classifiers
 
-* Gaussian
+Depending on the feature values of the dataset, specific types of NB Classifiers exist.
 
-* Multinomial
+* Gaussian Naive Bayes:
+  is used when the feature values follow a guassian (ie. normal) distribution. For example the heights of people.
 
-* Bernoulli
+* Multinomial Naive Bayes:
+  is used when the features values are distinct counts. For example word counts.
 
-* Complement
+* Bernoulli Naive Bayes:
+  is used when the feature values can only take on one of two values and have no ordering. For example when they are booleans.
 
-* Categorical
-
-<!-- Gaussian Naive Bayes: gaussiannb is used in classification tasks and it assumes that feature values follow a gaussian distribution. -->
-<!-- Multinomial Naive Bayes: It is used for discrete counts. For example, let’s say,  we have a text classification problem. Here we can consider Bernoulli trials which is one step further and instead of “word occurring in the document”, we have “count how often word occurs in the document”, you can think of it as “number of times outcome number x_i is observed over the n trials”. -->
-<!-- Bernoulli Naive Bayes: The binomial model is useful if your feature vectors are boolean (i.e. zeros and ones). One application would be text classification with ‘bag of words’ model where the 1s & 0s are “word occurs in the document” and “word does not occur in the document” respectively. -->
-<!-- Complement Naive Bayes: It is an adaptation of Multinomial NB where the complement of each class is used to calculate the model weights. So, this is suitable for imbalanced data sets and often outperforms the MNB on text classification tasks. -->
-<!-- Categorical Naive Bayes: Categorical Naive Bayes is useful if the features are categorically distributed. We have to encode the categorical variable in the numeric format using the ordinal encoder for using this algorithm. -->
+* Categorical Naive Bayes:
+  is used when the feature values are categorical, in other words they have no ordering. For example the color of a car.
 
 
 #### Training and Prediction with Naive Bayes
 
-A Naive Bayes model is "trained" throught calculating the probabilities needed. First the a priori probabilities $P(c)$ of each class are calculated using their frequency of appearance in the training set:
+A Naive Bayes model is trained thought calculating the probabilities needed. First, the a priori probabilities $P(c)$ of each class are calculated using their frequency of appearance in the training set:
 
 \begin{equation}
 \label{eq:apriory_freq}
@@ -196,16 +195,8 @@ P(c_i)= \frac{n_i}{N}
 $n_i$ is the number of samples of class $c_i$
 and $N$ is the total number of samples.
 
-Then, depending on the exact type of Naive Bayes used, the probability of each feature given a class is calcutated.
+Then, depending on the exact type of Naive Bayes used, the probability of each feature given a class is calculated [@zhang2004optimality].
 
-A kernel function to estimate the probability of (?) TODO may be used to improve it's performance much like it's used for dimensionallity reduction in <!-- TODO: ref -->
+A kernel function may be used to estimate the probabilities in order to improve it's performance much like it's used for dimensionallity reduction in <!-- TODO: ref -->
 
-[@zhang2004optimality]
 
-### SVM
-
-Support Vector Machines is a linear binary classifier that works by attempting to find the hyperplane separating two classes.
-
-#### Kernel Trick
-
-As a linear classifier, a linearly separable dataset is usually required \ref{sec:linear}. If instead(?instead of what) a

@@ -15,7 +15,7 @@ format:
     wordcount-pdf:
         # template: /home/evan/.pandoc/templates/eisvogel.latex
         # template: /home/evan/.pandoc/templates/new.latex # rec
-        highlight-style: github
+        # template: ./template.latex
         toc: false
         number-depth: 3
         number-sections: true
@@ -24,6 +24,9 @@ format:
             - file: packages.tex
             - file: macros.tex
         keep-tex: true # ok
+        latex-auto-install: false
+        pandoc-args: "--lua filter ./filters/minted.lua"
+        pdf-engine-opt: "-shell-escape"
         cite-method: biblatex # ok
         documentclass: scrreprt # ok ?
         # documentclass: report # ok ?
@@ -35,6 +38,14 @@ format:
         # monofont: Source Code Pro # ok
         monofont: Monaspace Argon
         linestretch: 1.5 # ok
+        linkcolor: uniwablue
+        urlcolor: uniwablue
+        citecolor: uniwaorange
+        # code-line-numbers: true
+        highlight-style: github
+        code-block-border-left: "#123c64"
+        code-block-bg: "#e5e6ee"
+
 # output: 
 #     pdf:
 lang: en # rec
@@ -58,3 +69,6 @@ biblatexoptions: sorting=none
 # caption-justification: centering
 # toc-own-page: false
 
+# RELEASE_URL=https://github.com/pandoc/lua-filters/releases/latest
+#curl -LSs $RELEASE_URL/download/lua-filters.tar.gz | \
+#    tar --strip-components=1 --one-top-level=$PANDOC_DIR -zvxf -

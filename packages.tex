@@ -1,5 +1,5 @@
 \usepackage{tikz}
-\usepackage{amsmath,amsthm}
+\usepackage{amsmath,amsthm,amssymb}
 \usepackage{units}
 % \newfontfamily\greekfont{LiberationSerif}
 % \newfontfamily\greekfontsf{LiberationSerif}
@@ -17,9 +17,9 @@
 \usepackage{xcolor}
 % \usepackage{tocloft}
 % \usepackage{drawstack}
-\definecolor{uniwalightblue}{RGB}{103, 173, 224}
-\definecolor{uniwablue}{RGB}{18, 60, 100}
-\definecolor{uniwaorange}{RGB}{230, 124, 23}
+\definecolor{uniwalightblue}{RGB}{103, 173, 224} % #67ade0
+\definecolor{uniwablue}{RGB}{18, 60, 100} % #123c64
+\definecolor{uniwaorange}{RGB}{230, 124, 23} % #e67c17
 \definecolor{light-gray}{gray}{0.95}
 \usepackage{hyperref}
 \hypersetup{
@@ -30,6 +30,4 @@
 }
 \urlstyle{same}
 
-\newcommand*\circled[1]{\tikz[baseline=(char.base)]{
-    \node[shape=circle,draw,inner sep=1.6] (char) {#1};}
-}
+\newcommand{\codelistingname}{Listing}

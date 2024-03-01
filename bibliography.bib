@@ -370,3 +370,49 @@ pages = {},
 title = {Pattern Recognition},
 isbn = {0-12-685875-6}
 }
+
+@Article{coordinate,
+author={Wright, Stephen J.},
+title={Coordinate descent algorithms},
+journal={Mathematical Programming},
+year={2015},
+month={Jun},
+day={01},
+volume={151},
+number={1},
+pages={3-34},
+abstract={Coordinate descent algorithms solve optimization problems by successively performing approximate minimization along coordinate directions or coordinate hyperplanes. They have been used in applications for many years, and their popularity continues to grow because of their usefulness in data analysis, machine learning, and other areas of current interest. This paper describes the fundamentals of the coordinate descent approach, together with variants and extensions and their convergence properties, mostly with reference to convex objectives. We pay particular attention to a certain problem structure that arises frequently in machine learning applications, showing that efficient implementations of accelerated coordinate descent algorithms are possible for problems of this type. We also present some parallel variants and discuss their convergence properties under several models of parallel execution.},
+issn={1436-4646},
+doi={10.1007/s10107-015-0892-3},
+url={https://doi.org/10.1007/s10107-015-0892-3}
+}
+
+@manual{cudadocs,
+	title = {CUDA C++ Programming Guide},
+	author = {NVIDIA},
+	url = {https://docs.nvidia.com/cuda/cuda-c-programming-guide/},
+}
+
+@manual{clang,
+title={Compile CUDA with LLVM},
+author={the LLVM community},
+url={https://llvm.org/docs/CompileCudaWithLLVM.html}
+}
+
+@inproceedings{clangGPGPU,
+author = {Wu, Jingyue and Belevich, Artem and Bendersky, Eli and Heffernan, Mark and Leary, Chris and Pienaar, Jacques and Roune, Bjarke and Springer, Rob and Weng, Xuetian and Hundt, Robert},
+title = {gpucc: an open-source GPGPU compiler},
+year = {2016},
+isbn = {9781450337786},
+publisher = {Association for Computing Machinery},
+address = {New York, NY, USA},
+url = {https://doi.org/10.1145/2854038.2854041},
+doi = {10.1145/2854038.2854041},
+abstract = {Graphics Processing Units have emerged as powerful accelerators for massively parallel, numerically intensive workloads. The two dominant software models for these devices are NVIDIA’s CUDA and the cross-platform OpenCL standard. Until now, there has not been a fully open-source compiler targeting the CUDA environment, hampering general compiler and architecture research and making deployment difficult in datacenter or supercomputer environments. In this paper, we present gpucc, an LLVM-based, fully open-source, CUDA compatible compiler for high performance computing. It performs various general and CUDA-specific optimizations to generate high performance code. The Clang-based frontend supports modern language features such as those in C++11 and C++14. Compile time is 8\% faster than NVIDIA’s toolchain (nvcc) and it reduces compile time by up to 2.4x for pathological compilations (>100 secs), which tend to dominate build times in parallel build environments. Compared to nvcc, gpucc’s runtime performance is on par for several open-source benchmarks, such as Rodinia (0.8\% faster), SHOC (0.5\% slower), or Tensor (3.7\% faster). It outperforms nvcc on internal large-scale end-to-end benchmarks by up to 51.0\%, with a geometric mean of 22.9\%.},
+booktitle = {Proceedings of the 2016 International Symposium on Code Generation and Optimization},
+pages = {105–116},
+numpages = {12},
+keywords = {optimization, compiler, GPU},
+location = {Barcelona, Spain},
+series = {CGO '16}
+}

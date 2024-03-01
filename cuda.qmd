@@ -1,0 +1,114 @@
+
+# CUDA
+
+Graphics Processing Units (GPU)s, as the name implies, were originally created to accelerate graphical and image processing applications. Graphics programming at it's core is an inherently parallel computing problem, thus GPUs where made to support such massively parallel computing. Some of the earliest attempts at general purpose computing on graphics processing units (GPGPU) where done using programming models intended for graphics processing which was rather cumbersome and inelegant.
+
+Compute Unified Device Architecture, or what is more commonly known as CUDA, is Nvidia's GPGPU Application Programming Interface (API) and computing platform. It includes a C/C++ compiler, `nvcc` which is based on LLVM, and a sleuth of libraries for GPU accelerated processing: including but not limited to cuBLAS (Basic Linear Algebra Subprograms), cuFFT (Fast Fourier Transform) and more. Official Support for CUDA also exists for Fortran and unoffical support exists in other languages that support foreign function interfaces (FFI) into C code, using wrappers from third parties.
+
+## Programming Model
+
+The CUDA programming model is a stream programming model where a kernel function (not to be confused with the kernel functions defined in \numnameref{sec:kernel}) is applied to a stream of data points. This is an embarrassingly parallel workload that obviously maps very well for use with GPGPU. It is also a heterogeneous programming model where a distinction is made between code that is to be run on the CPU, known as host code, and code that is meant to be run on the GPU, known as device code. Host code is perfectly normal C/C++ and abides by that language's syntax and rules, with the exception of kernel invocation, see \numnameref{sec:exec}. Device code on the other hand, while syntactically identical with host code, comes with some major restrictions: Big parts of the C standard library and C++'s standard template library (STL) are unavailable, with exceptions such as `printf` to facilitate the printing of debug information.. Device code also has access to a wide range of device only library functions and compiler intrinsics. A full list of the restrictions and extensions available exists in the CUDA C++ Programming Guide [@cudadocs, see sections: C++ Language Extentions and C++ Language Support]
+
+### Execution and Threading Model {#sec:exec}
+
+Functions can be marked as host code, device code or kernels, using the compiler attributes `__host__` for host code, `__device__` for device code and `__global__` for kernels. A function can be marked both `__host__` and `__device__`, to imply that a function can be called from both host and device code.
+
+Kernel functions are executed in parallel $N$ times by $N$ cuda threads. CUDA threads are the lowest class in the threading model. At the top of the threading model hierarchy are *grids*, which map to the available hardware GPUs. Grids are then made up of *blocks* with each block being executed by a Streaming Multiprocessor (SM) of the GPU. Blocks are made up of individual cuda *threads* which map into individual CUDA cores. Optionally, *blocks* can also be grouped into *thread block clusters* to guarantee that they are run on the same *grid* in multi-GPU systems. Finally the threads of a block are executed by the SMs as groups known as warps, with the size of each warp being an implementation detail but usually 32.
+
+Kernel functions must have a return type of `void` and must be free functions and not methods of any class.
+\autoref{lst-kernel} contains an example of a kernel function `kernel`, marked with the `__global__` attribute. In `main()` the syntax used for kernel invocation is demonstrated. Kernel invocation is like a normal function call except that the function name is prepended with triple angle brackets `<<<...>>>` which is know as an execution configuration.
+
+```{#lst-kernel .cpp lst-cap="CUDA Kernel Invocation"}
+__global__ void kernel() {
+	printf("Hello from %d!\n", threadIdx.x);
+}
+
+int main(void) {
+	kernel<<<32,32>>>();
+
+	return 0;
+}
+```
+
+The parameters given in the execution configuration are `gridDim` of type `dim3`^[dim3: a struct containing the atributes `x`, `y` and `z` of integer type describing a three dimentional vector, can be initiallized with a single integer to imply a vector with y=1 and z=1] denoting the number and shape of blocks to be used, `blockDim` of type `dim3` denoting the number and shape of threads to be used by each block, `shared_size` of type `size_t`, an optional parameter, denoting the size of dynamically allocated shared memory for each block and `stream` an optional parameter defaulting to `0` denoting the id of the stream the kernel will use.
+
+![Grid of Thread Blocks](./img/grid-of-thread-blocks.png){width=50%}
+
+Builtin variables are provided in device code so that individual threads can use them to index into and operate on different data:
+
+* gridDim, of type `dim3`, signifies the shape of the grid
+
+* blockDim, of type `dim3`, signifies the shape of each block
+
+* blockIdx, of type `dim3`, signifies the ID of each block
+
+* threadIdx, of type `dim3`, signifies the ID of each thread
+
+* warpSize, of type `int`, signifies the size of the warp
+
+Using these builtins, a simple addition between two vectors has implemented in \autoref{lst-add-kernel}, where `SIZE_OF_VECTORS` is smaller than the total number of threads using in the execution configuration for this kernel.
+
+```{#lst-add-kernel .cpp lst-cap="CUDA Addition Kernel"}
+__global__ void add(double *a, double *b, double *result) {
+	unsigned int tid = threadIdx.x + blockDim.x * blockIdx.x;
+
+	if (tid < SIZE_OF_VECTORS) {
+		result[tid] = a[tid] + b[tid];
+	}
+}
+```
+
+
+#### Synchronization
+
+Synchronization between threads is achieved using compiler intrinsics. Block wide synchronization, as in synchronization between threads in the same block, is provided using the `__syncthreads()` primitive, which acts like a barrier where all threads in a block must wait until all of them reach it.
+
+::: {.callout-warning}
+It's important to note that if one thread in a block reaches a barrier, all threads must eventually reach it, otherwise a deadlock will happen. Extra caution must be taken when placing `__syncthreads()` in conditional branches.
+:::
+
+Warp wide synchronization and cooperation is achieved using:
+
+* warp vote intrinsics which implement warp wide reduce and broadcast operations [@cudadocs, section Warp Vote Functions]
+
+* warp reduce intrinsics which implement warp wide reductions [@cudadocs, section Warp Reduce Functions]
+
+* warp shuffle intrinsics which implement ways for threads exchange variables in a warp without using any shared memory [@cudadocs, section Warp Shuffle Functions]
+
+Grid synchronization intrinsics are not provided and as such has been achieved in many different ways, one of them being by using multiple kernel invocations. Synchronizations happened at the end of each kernel invocation.
+
+#### Cooperative Kernels
+
+Introduced in CUDA 9, cooperative kernels allowed more granular control of synchronization, including and not limited to grid wide synchronization, warp barrier synchronization and synchronization between specific groups of blocks. Using this cooperative model is done by including the `cooperative_groups.h` header file. Kernel invocation for cooperative kernels differs as it must make use of the `cudaLaunchCooperativeKernel` API, instead of execution configuration as mentioned before.
+
+Synchronization is achieved using barriers on groups of threads. There are many predefined kinds of thread groups including but not limited to: *thread block* groups, corresponding to the traditional thread groups synchronized by `__syncthreads()`, *grid* groups, corresponding to an entire grid of threads and more [@cudadocs, section Cooperative Groups].
+
+### Memory
+
+Memory in CUDA is separated in many different categories, the first one being host and device memory. Host memory is inaccessible from device code and vise versa. Data must be explicitly moved from the host to the device and back by using one of the variants of `cudaMemcpy*(src, dst, size, kind)`, where kind defines if the `src` and `dst` are on the host or device side. Device to device and host to host copying is also supported.
+
+On the device side memory is of four kinds:
+
+* *Global* memory, very slow memory that is accessible to the entire grid
+
+* *Block* shared memory, fast memory that is shared across a block, maps to the memory of each SM.
+
+* *Local* thread memory, very fast memory that is local to each thread, maps to the cache and registers of individual CUDA cores.
+
+* *Constant* memory, fast globally accessible memory that is however, immutable
+
+![Memory Hierarchy](./img/memory-hierarchy.png){width=50%}
+
+#### Unified Memory
+
+Unified or managed memory, introduced with CUDA, 6 allows the programmer to act as if they operate on a unified memory space by automagically managing the transfer of data from host to device and back. This can massively simplify the development of an application by removing the need to manually manage transfer of data. Unified memory is allocated using the `cudaMallocManaged()` memory allocation API [@cudadocs, section Unified Memory Programming].
+
+
+### Compilation
+
+Device code is written in the CUDA instruction set architecture known as `PTX`, directly using it is as cumbersome as writing `x86_64` assembly is so, as mentioned before, device code is written in an extended syntax of C/C++. Compilation of host and device code is done using split compilation by first separating host from device code with the compiler `nvcc` compiling the device code into `PTX` code itself and handing off the host code to the system's C compiler (usually `gcc` or `MSVC`).  During runtime `PTX` code is Just In Time (JIT) compiled machine code and cached for future use.
+
+::: {.callout-tip}
+`clang` can also be used to compile CUDA code [@clangGPGPU], but it uses what is known as *merged parsing*, the clang documentation claims that "[...] clang’s approach allows it to be highly robust to C++ edge cases, as it doesn’t need to decide at an early stage which declarations to keep and which to throw away [...]" [@clang].
+:::
+

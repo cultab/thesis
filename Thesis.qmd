@@ -24,3 +24,19 @@
 \newpage
 
 {{< include svm.qmd >}}
+
+\newpage
+
+{{< include cuda.qmd >}}
+
+\newpage
+
+{{< include parallel_svm.qmd >}}
+
+\newpage
+
+{{< include impl.qmd >}}
+
+\newpage
+
+{{< include results.qmd >}}

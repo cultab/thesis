@@ -1,0 +1,7 @@
+# Improvements to SVM using Parallelization {#sec:SVM}
+
+## Extreme Cascade Machines
+
+## P-SVM ?
+
+## GPUSVM

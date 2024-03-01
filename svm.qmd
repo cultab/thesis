@@ -2,7 +2,7 @@
 
 Support Vector Machines is a linear binary classifier that works by attempting to find the maximally separating hyperplane between two classes. A hyperplane is an $n-1$ dimensional vector where $n$ is the dimensionality of the feature space.
 
-<!-- TODO: Hyperplane image -->
+![Maximum-margin hyperplane and margin for an SVM trained on two classes. Larhmam / [CC BY-SA 4.0 DEED](https://creativecommons.org/licenses/by-sa/4.0/deed.en)](./img/svm_margin.png){width=50%}
 
 <!-- \coordinate (i) at (800/9,2600/27); -->
 <!-- \coordinate (j) at (800/9,0); -->
@@ -35,49 +35,60 @@ Support Vector Machines is a linear binary classifier that works by attempting t
 
 #### The Primal Problem
 
-More formally an SVM classifier tries to solve a constrained optimization problem. We will now prove that SVM's problem is a constraint optimization problem.
-We will define $w$ to be the separating hyperplane, $b$ a bias term and $x$ a vector of $n$ feature samples. 
+More formally an SVM classifier tries to solve a constrained optimization problem. This section will now prove that SVM's problem is a constraint optimization problem.
+Let $w$ to be the separating hyperplane, $b$ a bias term and $x$ a vector of $n$ feature samples. 
 
 <!-- TODO: start with earlier SVM definition -->
 
-\begin{equation}
+\begin{equation}\label{eq:primal}
 \min\limits_{w,b} \frac{||W||^2}{2}
 \end{equation}
 
+\begin{subequations}
 Subject to:
-\begin{align*}
-y_i(w^T +b) >= 1 \text{for } i=1,...,n
-\end{align*}
+\begin{equation}
+y_i(w^T +b) >= 1, \; \text{for } i=1,\ldots,n
+\end{equation}
+\end{subequations}
 
 The problem can also be expressed as a general convex optimization problem of the following form:
+
 \begin{equation}
 \min\limits_{x} f(x)
 \end{equation}
 
 Subject to:
-\begin{align*}
-g_i(x) \leq 0, \text{for } i=1,...,n
-\end{align*}
+
+\begin{subequations}
+\begin{equation}
+g_i(x) \leq 0, \; \text{for } i=1,\ldots,n
+\end{equation}
+\end{subequations}
 
 Substituting with:
-\begin{align*}
-f(w,b) =& \frac{||W||^2}{2} \\
-g_{i}(w,b) \leq& 0 \\
-g_{i}(w,b) =& 1 - y_i(w^T x_i + b) \\
-\end{align*}
 
-As such we can finally write the problem as:
+\begin{subequations}
+\begin{gather}
+f(w,b) = \frac{||W||^2}{2} \\
+g_{i}(w,b) = 1 - y_i(w^T x_i + b)
+\end{gather}
+\end{subequations}
+
+As such the problem can finally be written as:
+
 \begin{equation}
 \min\limits_{w,b}f(w,b), \text{where } f(w,b) = \frac{||W||^2}{2}
 \end{equation}
 
 Subject to:
-\begin{align*}
-g_{i}(w,b) \leq& 0 \\
-g_{i}(w,b) =& 1 - y_i(w^T x_i + b) \\
-\end{align*}
+\begin{subequations}
+\begin{gather}
+g_{i}(w,b) \leq 0 \\
+g_{i}(w,b) = 1 - y_i(w^T x_i + b) \\
+\end{gather}
+\end{subequations}
 
-But for this to actually be a convex optimization problem, we will need to show that $f$ and all $g_i$ are convex functions.
+But for this to actually be a convex optimization problem, it will need to be shown that $f$ and all $g_i$ are convex functions.
 
 For $f$ it is sufficient to show that it's Hessian matrix is positive semidefinite (PSD). For a matrix to be PSD it is sufficient to show that $\forall z$ $z^THz>=0$.
 
@@ -104,7 +115,7 @@ H = \begin{bmatrix}
     \end{bmatrix}
 \end{equation}
 
-Knowing that $\nicefrac{1}{2} ||W||^2 = \nicefrac{1}{2} \sum_{i=1}^{d} w_i^2$, we can compute the first partial derivative and get:
+Knowing that $\nicefrac{1}{2} ||W||^2 = \nicefrac{1}{2} \sum_{i=1}^{d} w_i^2$, the first partial derivative can be computed to get:
 
 \begin{equation}
 H = \begin{bmatrix} 
@@ -136,7 +147,7 @@ z^T z \geq &0 \Rightarrow \\
 Which clearly holds true.
 \end{proof}
 
-Similarly we will show that all $g_i$ are convex, because their Hessians are PSD.
+Similarly it will shown that all $g_i$ are convex, because their Hessians are PSD.
 
 \begin{proof}
 
@@ -164,7 +175,7 @@ For which $\forall z$, $z^THz>=0$ clearly holds true.
 
 #### The Dual Problem
 
-To solve this "primal" optimization problem, we will make use the "dual" form of this problem. We introduce the generalized Lagrangian, defined as:
+The dual form of this problem will be used to solve the primal form of this optimization problem. Introducing the generalized Lagrangian, defined as:
 
 \begin{equation}
 L(x,z) = f(x) + \sum_{i=1}^n a_i g_i(x)
@@ -174,18 +185,20 @@ Where $a_i$ are what are known as Lagrange multipliers.
 
 Denote:
 
-\begin{align}
+\begin{equation}
+\begin{split}
 \theta_P(x) &=\max\limits_{a: a_i\geq0} L(x, a) \\
-\theta_P(x) &= \max\limits_{a: a_i\geq0} f(x) + \sum_{i=1}^n a_i g_i(x)
-\end{align}
+            &= \max\limits_{a: a_i\geq0} f(x) + \sum_{i=1}^n a_i g_i(x)
+\end{split}
+\end{equation}
 
 Assume that an $x$, violates one primal $g_j(x) > 0$ constraint.
-Since we are picking the maximum $a$, we can we let $a_j \rightarrow \infty$, we get $\theta_P(x) = \infty$.
+Since the maximum $a$ is picked, let $a_j \rightarrow \infty$, to get $\theta_P(x) = \infty$.
 
 Assume that an $x$, satisfies **all** primal $g_j(x) \leq 0$ constraint.
-We can let all $a_j = 0$, and get $\theta_P(x) = f(x)$.
+Let all $a_j = 0$, and get $\theta_P(x) = f(x)$.
 
-From this we can see that if we assume that x satisfies all primal constraints that the following has the same optimal solution as the original primal problem:
+From this it is shown that if we assume that x satisfies all primal constraints that the following has the same optimal solution as the original primal problem:
 
 \begin{equation}
 \min\limits_{x}\theta_P(x) = \min\limits_{x}\max\limits_{a: a_i\geq0} L(x,a)
@@ -193,17 +206,23 @@ From this we can see that if we assume that x satisfies all primal constraints t
 
 Let $p^* = \min\limits_{x}\theta_P(x)$ denote the **primal value**.
 
+\begin{minipage}{\textwidth}
 A dual problem is defined as a function:
 
 \begin{equation}
 \theta_D(a) = \min\limits_{x}L(x,a)
 \end{equation}
 
-and a **dual value**:
+and a \textbf{dual value}:
 
 \begin{equation}
-d^* = \max\limits_{a: a_i\geq0} \theta_D(a) = \max\limits_{a: a_i\geq0}\min\limits_{x}L(x,a)
+\begin{split}
+d^* &= \max\limits_{a: a_i\geq0} \theta_D(a) \\
+    &= \max\limits_{a: a_i\geq0}\min\limits_{x}L(x,a)
+\end{split}
 \end{equation}
+
+\end{minipage}
 
 The maximum of the minimum of something is obviously less than or equal to the minimum of the maximum of something, and as such we can see that $d^* \leq p^*$
 
@@ -216,14 +235,14 @@ If the problem pair has strong duality, then for any solution $x^{*}$ to the pri
 
 The KKT conditions are as follows:
 
-\begin{alignat}{3}
-&\frac{\partial L(x^*, a^*)}{\partial x_i} &= 0 \; &\forall i \in [1,d] \label{eq:KKT1} \\
-&a_i^* g_i(x^*) &= 0 \; &\forall i \in [1,n] \label{eq:KKT2} \\
-&g_i(x^*) &\leq 0 \; &\forall i \in [1,n] \label{eq:KKT3}  \\
-&a_i^* &\geq 0 \; &\forall i \in [1,n] \label{eq:KKT4}
-\end{alignat}
-
-Where all $i$ are $\in \mathbb{N}$
+\begin{equation} \label{eq:KKT}
+\begin{split}
+\frac{\partial L(x^*, a^*)}{\partial x_i} = 0 \; \forall i \in 1,\ldots,n \\
+a_i^* g_i(x^*) = 0 \; \forall i \in 1,\ldots,n \\
+g_i(x^*) \leq 0 \; \forall i \in 1,\ldots,n \\
+a_i^* \geq 0 \; \forall i \in 1,\ldots,n
+\end{split}
+\end{equation}
 
 If $f$ and all $g_i$ are convex and the $g_i$ constraints are strictly feasible^[strictly feasible: $\exists x, g_i(x)<0, \forall i$] it is trivial to prove that $d^* = p^*$.
 
@@ -242,7 +261,7 @@ We will now attempt to solve the dual form of the problem:
 &\max\limits_{a: a_i \geq 0} \min\limits_{w,b} \nicefrac{1}{2} ||W||^2 - \sum_{i=1}^n a_i (y_i(w^T x_i + b) - 1) \label{eq:dual2}
 \end{align}
 
-From \autoref{eq:KKT1} we know that all the partial derivatives of the Generalized Lagrangian will equal 0. Taking the partial derivative in respect to $w_j$:
+From the first KKT condition in \autoref{eq:KKT} we know that all the partial derivatives of the Generalized Lagrangian will equal 0. Taking the partial derivative in respect to $w_j$:
 
 \begin{align}
 \frac{\partial \nicefrac{1}{2} ||W||^2 - \sum_{i=1}^n a_i(y_i(w^T x_i + b) -1)}{\partial w_j} &= 0 \Rightarrow \\
@@ -264,7 +283,7 @@ Expanding it:
 &\max\limits_{a: a_i \geq 0} \min\limits_{w,b} \sum_{i=1}^n a_i - \nicefrac{1}{2} \sum_{i=1}^n \sum_{j=1}^n a_i a_j y_i y_j x_i^T x_j - b \sum_{i=1}^n a_i y_i \label{eq:dual4}
 \end{align}
 
-Again from \autoref{eq:KKT1} we know that all the partial derivatives of the Generalized Lagrangian will equal 0. Now taking the partial derivative in respect to $b$:
+Again from the first KKT condition in \autoref{eq:KKT} we know that all the partial derivatives of the Generalized Lagrangian will equal 0. Now taking the partial derivative in respect to $b$:
 
 \begin{align}
 \frac{\partial \nicefrac{1}{2} ||W||^2 - \sum_{i=1}^n a_i(y_i(w^T x_i + b) -1)}{\partial b} &= 0 \Rightarrow \\
@@ -303,7 +322,6 @@ b &= - \frac{1}{2}(\min\limits_{i:y_i=1} w^T x_i + \max\limits_{i:y_i=-1} w^T x_
 As a linear classifier, a linearly separable dataset is usually required \ref{sec:linear}. But what we can do is perform a feature transform to a space where it is linearly separable.
 
 <!-- TODO: image of distance from the origin example -->
-
 
 \begin{theorem}
 Mercer's theorem. Let $x \in \mathbb{R}^l$ and a mapping $\phi$:
@@ -391,7 +409,7 @@ y_i(w^T x_i + b) \geq 1 - \xi_i \; &\forall i \in [1,n] \\
 \xi_i \geq 0 \; &\forall i \in [1,n] 
 \end{align}
 
-From \autoref{eq:KKT1} again, we know the partial derivatives of the generalized Lagrangian will be equal to zero. Taking the partial derivative of \autoref{eq:dual_reg} in respect to $w_j$:
+From \autoref{eq:KKT} again, we know the partial derivatives of the generalized Lagrangian will be equal to zero. Taking the partial derivative of \autoref{eq:dual_reg} in respect to $w_j$:
 
 \begin{align}
 \frac{\partial L(w,b,\xi,a,r)}{\partial w_j} &= 0 \Rightarrow \\
@@ -444,25 +462,32 @@ We can now note that $r$ does not appear in the problem function and that we can
 
 Subject to:
 
-\begin{align*}
+\begin{align}
 &\sum_{i=1}^n a_i y_i = 0 \label{eq:lincon} \\
 & 0 \leq a_i \leq C \; \forall i \in [1,n]
-\end{align*}
+\end{align}
 
-The kernel trick from \autonameref{sec:kernel}, still applies.
-
-# Improvements to SVM {#sec:SVM}
-
-The dual form we have come upon in \autoref{eq:dual_final}, as well as the kernelized form in \autoref{eq:dual_kernel} can be solved using standard quadratic programming (QP) solvers. Using those can be very performance and memory intensive. For that reason many techniques where developed to speed up SVM.
+::: {.callout-note}
+The kernel trick from \numnameref{sec:kernel}, still applies.
+:::
 
 ## Sequential Minimization Optimization
 
-One of the more successful ones was Sequential Minimization Optimization (SMO) which takes the relatively large QP problem of SVM, breaks it into many smaller ones, and solves them analytically [@smo].
+The dual form we have derived in \autoref{eq:dual_final}, as well as the kernelized form in \autoref{eq:dual_kernel} can be solved using standard quadratic programming (QP) solvers. Using those can be very performance and memory intensive. For that reason many techniques where developed to speed up SVM. One of the more successful ones was Sequential Minimization Optimization (SMO) which takes the relatively large QP problem of SVM, breaks it into many smaller ones, and solves them analytically [@smo]. For each optimization step due to the linear constraint in \autoref{eq:lincon}, two Lagrange multipliers are jointly optimized at a time.
 
-For each optimization step due to \autoref{eq:lincon}, two Lagrange multipliers are jointly optimized at a time.
+More specifically a high level overview of how the SMO algorithm works is as follows:
 
-## Cascade SVM
+1. Pick one Lagrange multiplier to $a_1$ optimize, using the First Choice Heuristic.
 
-## Extreme Cascade Machines ?
+2. Pick a second Lagrange multiplier $a_2$ to optimize, using the Second Choice Heuristic.
 
-## GPUSVM
+3. Calculate the prediction error $E_i = \text{Output of SVM on point i} - y_i$ for the first and second multiplier.
+
+4. Using the prediction errors, perform what is essentially coordinate descend [@coordinate, page 11], to move both multipliers closer to their optimal value.
+
+5. This is repeated until all multipliers satisfy the KKT conditions, within a small margin $\epsilon$, the original paper [@smo, page 48, Loose KKT Conditions] recommends a value in the range of $10^{-2}$ to $10^{-3}$ for the margin.
+
+The First Choice Heuristic attempts to find a Lagrange multiplier that violates the KKT conditions. To speed up the training multipliers that are bounded^[bounded multipliers: when $a_i \neq C,\; a_i \neq 0$] are ignored --except if a full pass over the training set has not found a violating multiplier. In this case a full pass over all multipliers is done to find violating ones.
+
+The Second Choice Heuristic attempts to find a second Lagrange multiplier, one that maximises the absolute value of the prediction error on the samples $i_1$ and $i_2$.
+

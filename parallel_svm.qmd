@@ -1,7 +1,176 @@
-# Improvements to SVM using Parallelization {#sec:SVM}
+# Parallelization of SVM {#sec:SVM}
 
-## Extreme Cascade Machines
+<!-- Briefly introduce the concept of parallel SVM implementations. -->
 
-## P-SVM ?
+The use of parallelization techniques for speeding up SVM has been the topic of a lot of many research papers. This is because training SVM classifiers is a very performance and memory intensive task that has lots of potential to make use of parallelization. A lot of the research is focused on GPGPU solutions, this is due to the high floating point performance of GPUs and their price to performance ratio compared to other techniques that require entire clusters of hardware to work. This section will cover the use of both traditional parallelization techniques as well as CUDA based GPGPU techniques and the algorithms that have been developed using them.
+
+## Parallelization Techniques
+
+There many parallelization techniques that show up in the available body of research. One of them being the parallelization of the SVM algorithm itself. Another one is the division of big training sets into smaller parts and then training SVMs on those in parallel with the goal of having a smaller working set of the dataset in memory. Another techniques employed has been parallel grid search, where multiple version of the same model are trained side by side, with different hyperparametes, in order to find the optimal hyperparametes for a given dataset.
+
+<!-- TODO: use Parallel Computing of Support Vector Machines: A Survey -->
+
+
+## Parallel SVM Algorithms:
+
+## P-SMO {#sec:psmo}
+
+Parallel Sequential Minimization Optimization or P-SMO, is an improvement of the SMO algorithm described in \autoref{sec:smo}. It attempts to break the dataset into $N$ parts and then assign each part to one of $N$ processors in an effort to minimize training and prediction times.
+
+The main idea of P-SMO, breaking the dataset into many smaller parts, is based on separating the dataset into part depending on each sample's Lagrangian multiplier and the sign of it's class. More specifically they define for each processor $k$:
+
+\begin{align}
+I_0^k &= \{i:y_i = 1,\; 0<a_i<C \}\cup \{i:y_i=-1,\;0<a_i<C \} \\
+I_1^k &= \{i:y_i = 1,\; a_i = 0 \} \\
+I_2^k &= \{i:y_i = -1, a_i = C \} \\
+I_3^k &= \{i:y_i = 1, a_i = C \} \\
+I_4^k &= \{i:y_i = -1, a_i = 0 \}
+\end{align}
+
+Where $C$ is the  hyperparameter representing the cost of misclassification.
+
+With $I^k$ for all processors, signifying the all indexes of the dataset the processor $k$ has been assigned.
+
+They define then define two bias terms $b_{low}$ and $b_{up}$ instead of just one:
+
+\begin{equation}
+\begin{split}
+b_{up}^k  = \min \{&E_i: i \in I_0 \cup I_1 \cup I_2 \} \\
+b_{low}^k = \max \{&E_i: i \in I_0 \cup I_3 \cup I_4 \} \\
+\text{where } &E_i \text{ is the prediction error on sample } i
+\end{split}
+\end{equation}
+
+And their associated indices as:
+
+\begin{equation}
+\begin{split}
+I_{up}^k  = \text{argmin} E_i \\
+I_{low}^k = \text{argmax} E_i
+\end{split}
+\end{equation}
+
+Then they match each index, $up$ and $low$, to one of the two Lagrangian multipliers $a_1$ and $a_2$ as defined in the SMO algorithm in \autoref{sec:smo}, without loss of generality assume that $a_1 = a_{up}^k$ and $a_2 = a_{low}^k$:
+
+::: {.callout-note}
+They define the prediction error as $E_i^k = \sum_{j=1}^l a_j y_j K(x_j, x_i) - y_i$, as expected.
+:::
+
+For each processor $k$:
+
+\begin{align}
+a_{I_{low}}^{new} =& a_{I_{low}}^old - \frac{y_2(E_{I_{low}}^{old} - E_{low}^{old})}{\eta} \\
+a_{I_{up}}^{new}  =& a_{I_{up}}^{old} + (y_{low} y_{up})(a_{I_{low}}^{old} - a_{I_{low}}^new)
+\end{align}
+
+Where $\eta = 2 K(x_1, x_2) - K(x_1, x_1) - K(x_2, x_2)$ and $K(\ldots)$ is the kernel function.
+Also, again as in SMO, both $a_{low}$ and $a_{up}$ are clipped to $(0,C)$.
+
+For the stopping criteria they define they the duality gap as the distance between the primal and the dual
+objective function and the dual value (which is updated at each step) as:
+
+\begin{align}
+\text{dual}^{new} &= \text{dual}^{old} - \frac{a_{I_{up}}^{new} - a_{I_{up}}^{old}}{y_i}(E^{old}_{I_{up}} - E^{old}_{I_{low}}) + \nicefrac{1}{2} \eta (\frac{a_{I_{up}}^{new} - a_{I_{up}}^{old}}{y_i})^2 \\
+\text{duality gap}^k &= \sum_{i=0}^l a_i y_i E_i + \sum_{i=0}^l\epsilon_i
+\end{align}
+
+Where each processor $p$ calculates it's own **duality gap** and the final value is given by summing all the values from each processor:
+
+\begin{equation}
+\text{duality gap} \sum_{p=1}^{\text{v}}\text{duality gap}^k
+\end{equation}
+
+Where $v$ is the total number of cpus.
+
+
+The stop criteria is hit when the duality gap is smaller or equal to the absolute value of the dual value times a constant $\tau = 10^{-6}$.
+
+\begin{equation}
+\text{duality gap} \leq \tau |dual|
+\end{equation}
+
+The pseudocode for the algorithm is in \autoref{lst-psmo}:
+
+```{#lst-psmo .c lst-cap="P-SMO Pseudocode"}
+for all p procesors
+	init a[i] = 0
+	init Error[i] = - y[i]
+	init gap = 0
+done
+
+while gap < tau * |dual| each processor
+	optimize a[I_up], a[I_low]
+	update E_i for all indices assigned to processor
+	calculate b_up, b_low, I_up, I_low and gap of each processor
+	reduce and broadcast b_up, b_low, I_up, I_low and gap
+end
+```
+
+### Results
+
+The implementation of P-SMO was done using the MPI (Message Passing Interface) library, a parallel/distributed computing library available for C/C++ and Fortran. Testing was done on an IBM p690 Regata SuperComputer with a total of 7 nodes, each with 32 Power_PC4 1.3Ghz cores. Experiments presented by @psmo in their paper show a sizable speedup when compared to both their own sequential SMO [@smo] implementation and state of the art LIBSVM [@libsvm] while maintaining high prediction accuracy.
+
+
+## Parallel-Parallel SMO
+
+Parallel-Parallel SMO or P2SMO is a P-SMO based GPU accelerated multiclass SVM solver. It takes advantage of the grid structure offered by CUDA to train $N$ binary SVM classifiers, with $P$ subsets of the dataset, in parallel by using $PxN$ blocks of threads. By training $N$ binary classifiers they can implement the OVA multiclass classification strategy.
+
+@p2smo show further speedup can be achieved by taking advantage of the unique implications of the parallel execution. Firstly they employ cross-task caching of kernel evaluations. More specifically kernel evaluations are shared across the $N$ different classifiers for samples that reside in the subset of the dataset split into $P$ parts. Secondly to minimize the unnecessary launch of grids with many idle rows of blocks, due to differing convergence rates of the binary classifiers, they reduce the number of rows of each grid launched, dynamically, as classifiers reach convergence. Lastly, inference is also done in parallel by reframing the prediction function as a matrix multiplication between a matrix $X$, that contains the training data, and a vector $z$ that contains the sample to be classified. The matrix multiplication was done using a standard CUBLAS function.
+
+### Results
+
+Two systems were used to obtain performance metrics, one equipped with a GeForce 8800 GT and one equipped with a Tesla C1060. A speedup on the order of 3-112 times was achieved for inference and a speedup of 3-57 times was achieved for training all while maintaining high prediction accuracy.
 
 ## GPUSVM
+
+Graphics Processing Unit Support Vector Machine (GPUSVM) is a CUDA based SVM package including a training tool, a cross validation tool and a prediction tool. In this paper "GPUSVM" is going to be used to refer to the underlying algorithm of the package. It is based on P-SMO, seen in \autoref{sec:psmo}, but adapted to run in a heterogeneous environment making use of both a GPU and CPU.
+
+The algorithm is modified so that kernel evaluations, the computing of $b_{low}^k$ and $b_{up}^k$ and the optimization of the Lagrange multipliers $a_{I_{low}}$ and $a_{I_{up}}$ are all done on the GPU. In each iteration all the resulting $b_{low}^k$, $b_{up}^k$ are moved to the host and reduced to the final $b_{low}$ and $b_{up}$ which are then used in the next iteration. The outer loop of the algorithm is run on the host, with only the inner loop running on the GPU ---this is also how $b_{low}$ and $b_{up}$ are supplied to the GPU, by argument, to the CUDA kernel of the inner loop. In \autoref{lst-gpusvm} we see the pseudocode for GPUSVM.
+
+```{#lst-gpusvm .c lst-cap="GPUSVM Pseudocode"}
+(device) init a[i] = 0
+(device) init Error[i] = - y[i]
+(device) init gap = 0
+
+(host)   while gap < tau * |dual|
+(device)     compute K(I_lo,I_up), K(I_up,I,up), K(I_low,I_low)
+(device)     optimize a[I_up], a[I_low]
+(device)     compute b_up^p, b_low^p, I_up^p, I_low^p
+(host)       compute b_up, b_low, I_up, I_low
+         end
+```
+
+### Results {#sec:gpusvm-end}
+
+Being a comprehensive package, it makes training SVM models very easy for end users through the use of the supplied GUI. Testing was done by @gpusvm on a system with two Intel Xeon X680 3.3GHz 6 core CPUs, 96GBs of DDR3 1333MHz ECC RAM, six Tesla C2050s with 3GBs GDDR5 of VRAM and two Tesla C2070s with 6GBs GDDR5 of VRAM. As far as training and inference performance, they demonstrated a quite notable speedup compared to state of the art CPU based SVM solvers such as LIBSVM [@libsvm] while maintaining high prediction accuracy.
+
+
+## PCV
+
+Continued research on GPUSVM lead to the creation of the Parallel Cross-Validation algorithm (PCV), a parallel SVM solver that implements efficient multitask cross-validation. Cross-validation a technique used to find the optimal hyperparameters, such as the misclassification cost $C$ or the degree of a polynomial kernel, to be used with a specific dataset. The idea behind the technique, dubbed $n$-fold cross-validation, is that to find the optimal hyperparameters for the model, the dataset can be split into $n$ parts with each part being used as the training set and the rest as a testing set. For each fold a different subset is used as the training set. At the end of the $n$ folds, the hyperparameters of the model with the best accuracy on the testing sets are selected. PCV runs each task with different hyperparameters in parallel so that the kernel computations as well as the data used in each fold can be shared between tasks. Kernel computations are stored in a cache that is several times smaller than would be needed to store all needed kernel computations, as such a strategy of evicting the least recently used computation is used by way of a Least Recently Used (LRU) list.
+
+### Results
+
+Experiments were done on the same system as mentioned in \autoref{sec:gpusvm-end}. A massive decrease in the total number of kernel computations was observed when compared to the previous GPUSVM while maintaining the same prediction accuracy. This resulted in an even better speedup than before when compared to LIBSVM, again while preserving a high prediction accuracy.
+
+
+## SVM-SMO-SDG
+
+SVM-SMO-SDG is a hybrid of P-SMO and Stochastic Gradient Descend (SDG) used to implement an efficient data parallel SVM solver for use in a heterogeneous computing environment. The advantage of using the SDG algorithm is by speeding up the optimization of the Lagrangian Multipliers $a_1$, $a_2$ by quickly computing a new weight vector with \autoref{eq:sdg_w} and subsequently obtaining the value for $b$ using \autoref{eq:bee} and the prediction error for the samples $x_i$ and $x_j$ 
+
+\begin{align}
+w &\leftarrow w - \gamma_t \begin{cases}
+\lambda_w, & \text{if } y_t w^T \phi(x_t) > 1 \\
+\lambda_w - y_t \phi(x_t), & \text{otherwise}
+\end{cases} \label{eq:sdg_w} \\
+b &= y - w, x\label{eq:bee}
+\end{align}
+
+
+### Results
+
+Experiments were carried out on a system equipped with a dual-core Intel Xeon CPU @ 2.20 GHz with 12GBs of RAM and an NVIDIA Tesla V100 SXM2 with 16GBs of VRAM. They concluded that the use of SVM-SMO-SDG resulted in further speedups and a significant decrease in memory usage, all while maintaining prediction accuracy.
+
+::: {.callout-note}
+SVM-SMO-SDG also maintained a comparable number of support vectors produced to SMO, as opposed to PCV that produced significantly more.
+:::

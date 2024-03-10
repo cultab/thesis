@@ -6,6 +6,7 @@
 #include <cstddef>
 #include <cstdio>
 #include <cstdlib>
+#include <cuda_bf16.h>
 
 #ifdef TRACE
 const bool DEBUG = true;
@@ -16,11 +17,11 @@ const bool DEBUG = false;
 namespace types {
 
 using math_t = double;
+const math_t MATH_T_MAX = DBL_MAX;
 using label = int;
 using idx = size_t;
 const int PRINT_AFTER = 24;
 const int PRINT_DIGITS = 4 + PRINT_AFTER + 2;
-const math_t MATH_T_MAX = DBL_MAX;
 
 #define printd(var)                                                                                                    \
     do {                                                                                                               \

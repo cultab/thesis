@@ -236,83 +236,6 @@ struct cuda_vector : public base_vector<T> {
 #endif
     }
 
-
-    // // reduce the array to a single value stored at  TODO: which index?
-    // __device__ void reduce(std::function<T(idx)> func) {
-    //     unsigned int tid = blockDim.x * blockIdx.x + threadIdx.x;
-    //     unsigned int stride = blockDim.x * gridDim.x;
-    // }
-    //
-    // __device__ number min() {
-    //     unsigned int tid = blockDim.x * blockIdx.x + threadIdx.x;
-    //     unsigned int stride = blockDim.x * gridDim.x;
-    //     grid_group grid = this_grid();
-    //
-    //     number local_min = -types::NUM_MAX;
-    //     __shared__ number block_local_min;
-    //     __device__ number true_min;
-    //
-    //     if (tid == 0) {
-    //         true_min = -types::NUM_MAX;
-    //     }
-    //
-    //     if (threadIdx.x == 0) {
-    //         block_local_min = -types::NUM_MAX;
-    //     }
-    //
-    //     // find local min
-    //     for (idx i = tid; i < this->cols; i += stride) {
-    //         if (this->data[i] < local_min) {
-    //             local_min = this->data[i];
-    //         }
-    //     }
-    //     // find block local min
-    //     atomicMin(&block_local_min, local_min);
-    //     __syncthreads();
-    //
-    //     // block leaders find true min
-    //     if (threadIdx.x == 0) {
-    //         atomicMin(&true_min, block_local_min);
-    //     }
-    //     grid.sync();
-    //     return true_min;
-    // }
-    //
-    // __device__ number max() {
-    //     unsigned int tid = blockDim.x * blockIdx.x + threadIdx.x;
-    //     unsigned int stride = blockDim.x * gridDim.x;
-    //     grid_group grid = this_grid();
-    //
-    //     number local_max = -types::NUM_MAX;
-    //     __shared__ number block_local_max;
-    //     __device__ number true_max;
-    //
-    //     if (tid == 0) {
-    //         true_max = -types::NUM_MAX;
-    //     }
-    //
-    //     if (threadIdx.x == 0) {
-    //         block_local_max = -types::NUM_MAX;
-    //     }
-    //
-    //     // find local max
-    //     for (idx i = tid; i < this->cols; i += stride) {
-    //         if (this->data[i] < local_max) {
-    //             local_max = this->data[i];
-    //         }
-    //     }
-    //     // find block local max
-    //     atomicMax(&block_local_max, local_max);
-    //     __syncthreads();
-    //
-    //     // block leaders find true max
-    //     if (threadIdx.x == 0) {
-    //         atomicMax(&true_max, block_local_max);
-    //     }
-    //     grid.sync();
-    //     return true_max;
-    // }
-
     template <class F>
     __device__ void mutate(F func) {
         unsigned int tid = blockDim.x * blockIdx.x + threadIdx.x;
@@ -324,32 +247,6 @@ struct cuda_vector : public base_vector<T> {
         }
         grid.sync();
     }
-
-    // shared memory of size gridDim.x
-    // __device__ idx argMin(idx* s_index, T* s_value) {
-    //     // unsigned int tid = blockDim.x * blockIdx.x + threadIdx.x;
-    //     // unsigned int stride = blockDim.x * gridDim.x;
-    //     grid_group grid = this_grid();
-    //
-    //
-    //     // first block-reduce
-    //     unsigned int tid = threadIdx.x;
-    //     unsigned int i = blockIdx.x * blockDim.x + threadIdx.x;
-    //
-    //     s_index[tid] = i;
-    //     s_value[tid] = this->data[i];
-    //     for (idx s = blockDim.x/2; s > 0; s >>= 1) {
-    //         if (tid < s) {
-    //             if (s_value[tid] < s_value[tid + s]) {
-    //                 // nothing
-    //             } else {
-    //                 s_value[tid] = s_value[tid + s];
-    //                 s_tid[tid] = s_tid[tid + s];
-    //             }
-    //         }
-    //         __syncthreads();
-    //     }
-    // }
 
     __device__ void set(T value) {
         unsigned int tid = blockDim.x * blockIdx.x + threadIdx.x;
@@ -380,7 +277,7 @@ inline void base_vector<int>::print(const char* msg) const {
 }
 
 template <>
-inline void base_vector<double>::print(const char* msg) const {
+inline void base_vector<math_t>::print(const char* msg) const {
     for (idx i = 0; i < this->cols; i++) {
         printf("%s[%zu]: %*.*f\n", msg, i, PRINT_DIGITS, PRINT_AFTER, this->data[i]);
     }

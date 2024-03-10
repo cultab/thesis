@@ -62,10 +62,10 @@ class dataset {
 
         // discard header
         if (header) {
-            puts("header:");
+            // puts("header:");
             // FIX: fgets ?
             fscanf(input, "%[^\n]\n", buf);
-            printf("|%s|\n", buf);
+            // printf("|%s|\n", buf);
         }
 
         for (size_t i = 0; i < samples; i++) {

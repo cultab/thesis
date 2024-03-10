@@ -3,15 +3,84 @@
 
 <!-- Ωστόσο, μια τυπική εργασία αποτελείται ενδεικτικά από περίπου 70 έως 140 σελίδες (περίπου 20.000 έως 40.000 λέξεις), εξαιρουμένης της βιβλιογραφίας και των παραρτημάτων της. -->
 
+<!-- title page ? -->
+
+<!-- title page in greek -->
+
+<!-- copyright notice -->
+
+Ο κάτωθι υπογεγραμμένος Κατσανδρής Ευάγγελος του Εμμανουήλ, με αριθμό μητρώου 711171014 φοιτητής του Τμήματος Μηχανικών Πληροφορικής και Υπολογιστών της Σχολής Μηχανικών του Πανεπιστημίου Δυτικής Αττικής, δηλώνω ότι:
+
+«Βεβαιώνω ότι είμαι συγγραφέας αυτής της Διπλωματικής εργασίας και κάθε βοήθεια την οποία είχα για την προετοιμασία της, είναι πλήρως αναγνωρισμένη και αναφέρεται στην εργασία. Επίσης, οι όποιες πηγές από τις οποίες έκανα χρήση δεδομένων, ιδεών ή λέξεων, είτε ακριβώς είτε παραφρασμένες, αναφέρονται στο σύνολό τους, με πλήρη αναφορά στους συγγραφείς, τον εκδοτικό οίκο ή το περιοδικό, συμπεριλαμβανομένων και των πηγών που ενδεχομένως χρησιμοποιήθηκαν από το διαδίκτυο. Επίσης, βεβαιώνω ότι αυτή η εργασία έχει συγγραφεί από μένα αποκλειστικά και αποτελεί προϊόν πνευματικής ιδιοκτησίας τόσο δικής μου, όσο και του Ιδρύματος. Παράβαση της ανωτέρω ακαδημαϊκής μου ευθύνης αποτελεί ουσιώδη λόγο για την ανάκληση του πτυχίου μου».
+
+\begin{minipage}{\textwidth}
+\centering
+Ο Δηλών
+\begin{figure}[H]
+\centering
+\includegraphics[width=0.2\textwidth]{./img/signature.png}
+\end{figure}
+Κατσανδρής Ευάγγελος
+\end{minipage}
+
+
+# Acknowledgements {.unnumbered}
+
+I would like to express my deepest gratitude to my parents for their continued love, support, and encouragement throughout my academic journey. Their sacrifices and belief in me have been the cornerstone of my achievements.
+
+I am also grateful to my brother for his work ethic, which allowed my parents to more easily support me through my studies, and for being a source of inspiration in pursuing my goals.
+
+Special thanks are due to, Prof. Vasilios Mamalis, for his invaluable guidance, and unwavering patience. Their mentorship, constructive feedback, and encouragement have been instrumental in shaping this thesis.
+
+<!-- I would also like to extend my appreciation to fellow students, for their insightful discussions, feedback, and encouragement throughout this research endeavor. -->
+
+Last but not least, I am grateful to my friends and extended family for their patience, understanding, and encouragement during this challenging yet rewarding journey.
+
+
+# Περίληψη {.unnumbered}
+
+Αντικείμενο της πτυχιακής εργασίας θα είναι ο σχεδιασμός, ανάπτυξη και αξιολόγηση σε περιβάλλον προγραμματισμού CUDA ενός αποδοτικού παράλληλων αλγορίθμου SVM για κατηγοριοποίηση δεδομένων. Η ανάπτυξη του ανωτέρω αλγορίθμου θα γίνει σε γλώσσα C/C++, ενώ η αξιολόγησή του θα πραγματοποιηθεί σε πραγματικό περιβάλλον σύγχρονων καρτών γραφικών (NVIDIA 1060 και NVIDIA RTX TITAN) και θα περιλαμβάνει σύγκριση (σε επίπεδο χρόνων απόκρισης, επιτάχυνσης-speedup και ακρίβειας της κατηγοριοποίησης/accuracy) με μια αντίστοιχή υλοποιήση σε σειριακό περιβάλλον εκτέλεσης.
+
+Επιστημονική Περιοχή: Παράλληλα Υπολογιστικά Συστήματα
+
+Λέξεις κλειδιά: SVM, CUDA, GPGPU, Παράλληλος Προγραμματισμός, Κατηγοριοποίηση Δεδομένων
+<!-- abstract & keywords in greek -->
+
+# Abstract {.unnumbered}
+
+The objective of this thesis will be the design, development and evaluation of an efficient parallel SVM classifier in a CUDA programming environment. The development of the above classifier will be done using C/C++, while the evaluation will be performed in a real, modern environment using modern GPUs (NVIDIA 1060 και NVIDIA RTX TITAN) and will include comparisons (latency, speedup and accuracy of classification) with an equivalent sequential implementation.
+
+Scientific Field: Parallel Computing Systems
+
+Keywords: SVM, CUDA, GPGPU, Parallel Programming, Data Classification
+
 \tableofcontents
 
 \listoffigures
 
 \listoftables
 
-<!-- \lstlistoflistings -->
+\listof{codelisting}{List of Listings}
 
-<!-- Αλφαβητικό Ευρετήριο Όρων aka συντομογραφίες -->
+<!-- {{< glossary table=true >}} -->
+
+# Glossary {.unnumbered}
+
+| Term | Definition       |
+|------|------------------|
+| CUDA | Compute Unified Device Architecture: A GPGPU platform and library. |
+| Classifier | An algorithm that assigns class labels to data. |
+| GPGPU | General Purpose GPU computing: The use of GPUs for accelarion of tasks other than image processing. |
+| GPU | Graphics Processing Unit: A hardware accelarator designed for use in image processing. |
+| OVA | One Versus All: A technique for using binary classifiers for multiclass classification, by training binary classifiers to separate samples into a specific class or one of the rest. |
+| OVO | One Versus One:  A technique for using binary classifiers for multiclass classification, by training binary classifiers to separate samples into one of two classes and picking the class most picked. |
+| OVR | One Versus Rest: see OVA. |
+| PSMO | Parallel SMO: A variant of SMO meant for use in parallel computing environments. |
+| QP | Quadratic Programming: A family of techniques for solving optimization problems involving quadratic functions. |
+| SMO | Sequential Minimization Optimization: An SVM algorithm based on coordinate descent instead of reliying upon standard QP techniques. |
+| SVM | Support Vector Machine: a data classification algorithm |
+| support vector | Samples on the margin of the separating hyperplane of an SVM. |
+
 
 \newpage
 
@@ -40,3 +109,13 @@
 \newpage
 
 {{< include results.qmd >}}
+
+# References {.unnumbered}
+
+::: {#refs}
+:::
+
+\newpage
+
+{{< include appendix.qmd >}}
+

@@ -11,6 +11,16 @@ enum Kernel_t { POLY, RBF, LINEAR };
 
 static const char* Kernel_t_name[] = {"POLYNOMIAL", "RADIAL BASIS FUNC", "LINEAR"};
 
+struct pred_tuple {
+	types::label a;
+	types::math_t b;
+};
+
+struct idx_tuple {
+	types::idx a;
+	types::idx b;
+};
+
 struct hyperparams {
     math_t cost;
     math_t tolerance;

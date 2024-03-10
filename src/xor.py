@@ -3,7 +3,7 @@ import random
 from typing import Iterable
 
 num_features = 8
-num_samples = 100
+num_samples = 10000
 
 # implements XOR
 def one(itr: Iterable[object]):

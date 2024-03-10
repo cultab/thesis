@@ -16,8 +16,9 @@
 #define max(a, b) a > b ? a : b
 #define min(a, b) a < b ? a : b
 
-#define BLOCKS 16
-#define THREADS 128
+static unsigned int THREADS;
+// #define BLOCKS 16
+// #define THREADS 128
 // #ifndef __CUDA_ARCH__
 // namespace cooperative_groups {
 // typedef int grid_group;
@@ -73,7 +74,7 @@ __host__ __device__ math_t Polynomial_Kernel(base_vector<math_t> a, base_vector<
 }
 
 class GPUSVM;
-__global__ static void train_CUDA_model(GPUSVM* model);
+__global__ static void train_CUDA_model(GPUSVM*, size_t);
 
 class GPUSVM {
 
@@ -110,6 +111,9 @@ class GPUSVM {
     cuda_vector<math_t> error;
     cuda_vector<math_t> ddata;
     cuda_vector<idx> dindx;
+    // vector<math_t> host_a;
+    // vector<label> host_y;
+    // matrix<math_t> host_x;
 
     cuda_vector<idx_kind> indices;
     math_t b;
@@ -119,8 +123,6 @@ class GPUSVM {
     math_t diff_tol; // alpha diff tolerance ?
     Kernel_t kernel_type;
 
-    // cudaLaunchCooperativeKernel
-    //  TODO: maybe initialize in host, transfer to cuda_vectors, then train?
     GPUSVM(dataset_shape& shape, matrix<math_t>& _x, vector<label>& _y, hyperparams params, Kernel_t _kernel_type)
         : x(_x),
           y(_y),
@@ -129,6 +131,9 @@ class GPUSVM {
           error(shape.num_samples),
           ddata(THREADS * 2),
           dindx(THREADS * 2),
+          // host_a(0),   // this will be transfered at the end
+          // host_y(y), // these get memcpy'ed
+          // host_x(x),
           indices(shape.num_samples),
           b(0),
           C(params.cost),
@@ -155,35 +160,60 @@ class GPUSVM {
         }
     }
 
-    void train() {
-        // int dev = 0;
+    float train() {
+
+        cudaEvent_t start, stop;
+        float time;
+
+        int dev = 0;
+        cudaDeviceProp deviceProp;
+        cudaGetDeviceProperties(&deviceProp, dev);
+        int supportsCoopLaunch = 0;
+        cudaDeviceGetAttribute(&supportsCoopLaunch, cudaDevAttrCooperativeLaunch, dev);
+		if (!supportsCoopLaunch) {
+			fprintf(stderr, "Cooperative kernels are not supported on this hardware\n!");
+		}
         /// This will launch a grid that can maximally fill the GPU, on the default stream with kernel arguments
-        // int numBlocksPerSm = 0;
-        // number of threads my_kernel will be launched with
-        // int numThreads = 128;
-        // cudaDeviceProp deviceProp;
-        // cudaGetDeviceProperties(&deviceProp, dev);
-        // cudaOccupancyMaxActiveBlocksPerMultiprocessor(&numBlocksPerSm, train_CUDA_model, numThreads, 0);
-        // dim3 dimBlock(numThreads, 1, 1);
-        // dim3 dimGrid(deviceProp.multiProcessorCount * numBlocksPerSm, 1, 1);
+        int numBlocksPerSm = 0;
+        // Number of threads my_kernel will be launched with
+        cudaGetDeviceProperties(&deviceProp, dev);
+        cudaOccupancyMaxActiveBlocksPerMultiprocessor(&numBlocksPerSm, train_CUDA_model, THREADS, 0);
+        dim3 dimBlock(THREADS, 1, 1);
+        dim3 dimGrid(deviceProp.multiProcessorCount * numBlocksPerSm, 1, 1);
+		printf("Using %u blocks!\n", dimGrid.x);
+
+        cudaErr(cudaEventCreate(&start));
+        cudaErr(cudaEventCreate(&stop));
+
+        cudaErr(cudaEventRecord(start));
         GPUSVM* dev_this = nullptr;
-        math_t* dev_data;
-        idx* dev_indx;
         // alloc
         cudaErr(cudaMalloc(&dev_this, sizeof(GPUSVM)));
         // move struct to device
         cudaErr(cudaMemcpy(dev_this, this, sizeof(GPUSVM), cudaMemcpyHostToDevice));
-        /*********************
-         * Nvidia, fuck you. *
-         *********************/
-        struct Params {
+        /*
+         * trully, whoever thought of this API <my lawyer has advised me not to continue this thought>
+         */
+        struct Param1 {
             GPUSVM* a;
         };
-        Params p{dev_this};
-        void* kernelArgs[] = {&p};
-        cudaErr(cudaLaunchCooperativeKernel((void*)train_CUDA_model, BLOCKS, THREADS, kernelArgs));
-        // cudaErr(cudaLaunchCooperativeKernel((void*)train_CUDA_model, 1, 1, kernelArgs));
+        struct Param2 {
+            size_t b;
+        };
+        Param1 p1{dev_this};
+        Param2 p2{THREADS * 2};
+        //  kernelArgs needs to be an array of N pointers, one for each argument of the kernel, we have 2 arguments
+        //  so we make 2 structs with our data inside them, and pass their address to kernelArgs
+        void* kernelArgs[] = {&p1, &p2};
+        cudaErr(cudaLaunchCooperativeKernel((void*)train_CUDA_model, dimGrid, dimBlock, kernelArgs,
+                                            THREADS * 2 * sizeof(idx) + THREADS * 2 * sizeof(math_t)));
         cudaErr(cudaMemcpy(this, dev_this, sizeof(GPUSVM), cudaMemcpyDeviceToHost));
+
+        cudaErr(cudaEventRecord(stop));
+        cudaErr(cudaEventSynchronize(stop));
+
+        cudaErr(cudaEventElapsedTime(&time, start, stop));
+        return time;
     }
 
     // device globals
@@ -196,7 +226,7 @@ class GPUSVM {
     math_t dev_b_lo = 1;
     math_t dev_b_up = -1;
 
-    __device__ void train_device() {
+    __device__ void train_device(size_t shared_memory) {
         a.set(0);
 
         unsigned int tid = blockDim.x * blockIdx.x + threadIdx.x;
@@ -363,7 +393,9 @@ class GPUSVM {
             blocks.sync();
 
             // std::tie(up, lo) = compute_b_up_lo();
-            std::tie(up, lo) = argMin();
+            auto result = argMin(shared_memory);
+            up = result.a;
+            lo = result.b;
 
             if (tid == 0) {
                 dev_b_lo = error[lo];
@@ -380,11 +412,13 @@ class GPUSVM {
                 //            : indices[i] == LO ? "LO"
                 //                               : "BOTH");
                 // }
-                printf("[%d]: b_lo[%lu] = %f, b_up[%lu] = %f!\t", tid, lo, dev_b_lo, up, dev_b_up);
-                printf("Gap = %f\n", dev_b_lo - (dev_b_up + 2 * tol));
+                // printf("[%d]: b_lo[%lu] = %f, b_up[%lu] = %f!\t", tid, lo, dev_b_lo, up, dev_b_up);
+                // printf("Gap = %f\n", dev_b_lo - (dev_b_up + 2 * tol));
             }
-            printf("[%d]: before\n", tid);
+            // printf("[%d]: before\n", tid);
+			blocks.sync();
         }
+        b = (dev_b_lo + dev_b_up) / 2;
     }
 
     __device__ void compute_index_types() {
@@ -411,14 +445,20 @@ class GPUSVM {
     // expects sdata, sindx of size blockDim.x * 2
     //         ddata, dindx of size gridDim.x * 2
     //         must have blockDim.x > gridDim.x
-    __device__ std::tuple<idx, idx> argMin() {
+    __device__ idx_tuple argMin(size_t shared_halfpoint) {
         unsigned int tid = blockDim.x * blockIdx.x + threadIdx.x;
         unsigned int stride = blockDim.x * gridDim.x;
         thread_block threads = this_thread_block();
         grid_group blocks = this_grid();
 
-        __shared__ idx sindx[THREADS * 2];
-        __shared__ math_t sdata[THREADS * 2];
+        extern __shared__ char shared_memory[];
+
+        // __shared__ idx sindx[THREADS * 2];
+        // __shared__ math_t sdata[THREADS * 2];
+
+        idx* sindx = reinterpret_cast<idx*>(shared_memory);
+        math_t* sdata = reinterpret_cast<math_t*>(shared_memory + (sizeof(idx) * shared_halfpoint));
+
         __shared__ math_t block_max;
         __shared__ idx block_max_i;
         __shared__ math_t block_min;
@@ -532,48 +572,48 @@ class GPUSVM {
 
         blocks.sync();
 
-        return std::make_tuple(dindx[0], dindx[1]);
+        return {.a = dindx[0], .b = dindx[1]};
     }
 
     // for 1 thread, sanity check of argmin/max
-    __device__ std::tuple<idx, idx> compute_b_up_lo() {
-        math_t b_up = +types::MATH_T_MAX;
-        math_t b_lo = -types::MATH_T_MAX;
-        idx i_up = 0;
-        idx i_lo = 0;
-
-        // find thread local b up and lo
-        // TODO: reduction instead of atomics?
-        for (idx i = 0; i < error.cols; i += 1) {
-            if (indices[i] == BOTH) {
-                if (error[i] < b_up) {
-                    b_up = error[i];
-                    i_up = i;
-                    // printf("new up %f\n", b_up);
-                }
-                if (error[i] > b_lo) {
-                    b_lo = error[i];
-                    i_lo = i;
-                    // printf("new lo %f\n", b_lo);
-                }
-            } else if (indices[i] == UP) {
-                // printf("[%d]: err[%lu]=%f b_up=%f\n", tid, i, error[i], b_up);
-                if (error[i] < b_up) {
-                    b_up = error[i];
-                    i_up = i;
-                    // printf("new up %f\n", b_up);
-                }
-            } else {
-                // printf("[%d]: err[%lu]=%f b_lo=%f\n", tid, i, error[i], b_lo);
-                if (error[i] > b_lo) {
-                    b_lo = error[i];
-                    i_lo = i;
-                    // printf("new lo %f\n", b_lo);
-                }
-            }
-        }
-        return std::make_tuple(i_up, i_lo);
-    }
+    // __device__ std::tuple<idx, idx> compute_b_up_lo() {
+    //     math_t b_up = +types::MATH_T_MAX;
+    //     math_t b_lo = -types::MATH_T_MAX;
+    //     idx i_up = 0;
+    //     idx i_lo = 0;
+    //
+    //     // find thread local b up and lo
+    //     // TODO: reduction instead of atomics?
+    //     for (idx i = 0; i < error.cols; i += 1) {
+    //         if (indices[i] == BOTH) {
+    //             if (error[i] < b_up) {
+    //                 b_up = error[i];
+    //                 i_up = i;
+    //                 // printf("new up %f\n", b_up);
+    //             }
+    //             if (error[i] > b_lo) {
+    //                 b_lo = error[i];
+    //                 i_lo = i;
+    //                 // printf("new lo %f\n", b_lo);
+    //             }
+    //         } else if (indices[i] == UP) {
+    //             // printf("[%d]: err[%lu]=%f b_up=%f\n", tid, i, error[i], b_up);
+    //             if (error[i] < b_up) {
+    //                 b_up = error[i];
+    //                 i_up = i;
+    //                 // printf("new up %f\n", b_up);
+    //             }
+    //         } else {
+    //             // printf("[%d]: err[%lu]=%f b_lo=%f\n", tid, i, error[i], b_lo);
+    //             if (error[i] > b_lo) {
+    //                 b_lo = error[i];
+    //                 i_lo = i;
+    //                 // printf("new lo %f\n", b_lo);
+    //             }
+    //         }
+    //     }
+    //     return std::make_tuple(i_up, i_lo);
+    // }
 
     // __device__ math_t predict_on(idx i) {
     //     // printf("      predict on %zu\n", i);
@@ -582,32 +622,32 @@ class GPUSVM {
     //
     __device__ __host__ math_t predict(vector<math_t>& sample) {
         // printf("      predict on %zu\n", i);
-        return Kernel(w, sample) /*+ b*/; // TODO: actually find b after training is done
+        return Kernel(w, sample); // TODO: actually find b after training is done
+                                  // math_t res = 0;
+                                  // for (idx i = 0; i < x.rows; i++) {
+                                  // 	res += host_a[i] * host_y[i] * Kernel(host_x[i], sample) + b;
+                                  // }
+                                  // return res;
     }
 
     void compute_w() {
+        // if (host_a.cols == 0) {
+        // 	host_a = a; // cudaMemcpy'ed
+        // }
         vector<math_t> host_a = a;
         vector<label> host_y = y;
         matrix<math_t> host_x = x;
-        // printd(host_a);
-        // printd(host_y);
-        // printd(host_x);
         w.set(0);
         for (idx k = 0; k < w.cols; k++) {
             for (idx i = 0; i < host_a.cols; i++) {
-                // printf("a %f\n", host_a[i]);
-                // printf("y %d\n", host_y[i]);
-                // printf("x %f\n", host_x[i][k]);
-                // printf("i %lu, k %lu\n", i, k);
-                // printf("product %f\n", host_a[i] * host_y[i] * host_x[i][k]);
                 w[k] += host_a[i] * host_y[i] * host_x[i][k];
             }
         }
     }
 };
 
-__global__ static void train_CUDA_model(GPUSVM* model) {
-    model->train_device();
+__global__ static void train_CUDA_model(GPUSVM* model, size_t shared_memory) {
+    model->train_device(shared_memory);
 }
 
 } // namespace SVM

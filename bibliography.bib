@@ -325,7 +325,7 @@ url = {https://doi.org/10.1145/361002.361007},
 doi = {10.1145/361002.361007},
 abstract = {This paper develops the multidimensional binary search tree (or k-d tree, where k is the dimensionality of the search space) as a data structure for storage of information to be retrieved by associative searches. The k-d tree is defined and examples are given. It is shown to be quite efficient in its storage requirements. A significant advantage of this structure is that a single data structure can handle many types of queries very efficiently. Various utility algorithms are developed; their proven average running times in an n record file are: insertion, O(log n); deletion of the root, O(n(k-1)/k); deletion of a random node, O(log n); and optimization (guarantees logarithmic performance of searches), O(n log n). Search algorithms are given for partial match queries with t keys specified [proven maximum running time of O(n(k-t)/k)] and for nearest neighbor queries [empirically observed average running time of O(log n).] These performances far surpass the best currently known algorithms for these tasks. An algorithm is presented to handle any general intersection query. The main focus of this paper is theoretical. It is felt, however, that k-d trees could be quite useful in many applications, and examples of potential uses are given.},
 journal = {Commun. ACM},
-month = {sep},
+month = {9},
 pages = {509–517},
 numpages = {9},
 keywords = {partial match queries, attribute, binary search trees, key, information retrieval system, binary tree insertion, nearest neighbor queries, associative retrieval, intersection queries}
@@ -376,7 +376,7 @@ author={Wright, Stephen J.},
 title={Coordinate descent algorithms},
 journal={Mathematical Programming},
 year={2015},
-month={Jun},
+month={6},
 day={01},
 volume={151},
 number={1},
@@ -415,4 +415,78 @@ numpages = {12},
 keywords = {optimization, compiler, GPU},
 location = {Barcelona, Spain},
 series = {CGO '16}
+}
+
+@article{psmo,
+  title={Parallel sequential minimal optimization for the training of support vector machines},
+  author={Cao, Li Juan and Keerthi, S Sathiya and Ong, Chong Jin and Zhang, Jian Qiu and Periyathamby, Uvaraj and Fu, Xiu Ju and Lee, Henry P},
+  journal={IEEE Trans. Neural Networks},
+  volume={17},
+  number={4},
+  pages={1039--1049},
+  year={2006}
+}
+
+@article{gpusvm,
+  title={GPUSVM: a comprehensive CUDA based support vector machine package},
+  author={Li, Qi and Salman, Raied and Test, Erik and Strack, Robert and Kecman, Vojislav},
+  journal={Open Computer Science},
+  volume={1},
+  number={4},
+  pages={387--405},
+  year={2011},
+  publisher={Versita}
+}
+
+@article{libsvm,
+author = {Chang, Chih-Chung and Lin, Chih-Jen},
+title = {LIBSVM: A library for support vector machines},
+year = {2011},
+issue_date = {April 2011},
+publisher = {Association for Computing Machinery},
+address = {New York, NY, USA},
+volume = {2},
+number = {3},
+issn = {2157-6904},
+url = {https://doi.org/10.1145/1961189.1961199},
+doi = {10.1145/1961189.1961199},
+abstract = {LIBSVM is a library for Support Vector Machines (SVMs). We have been actively developing this package since the year 2000. The goal is to help users to easily apply SVM to their applications. LIBSVM has gained wide popularity in machine learning and many other areas. In this article, we present all implementation details of LIBSVM. Issues such as solving SVM optimization problems theoretical convergence multiclass classification probability estimates and parameter selection are discussed in detail.},
+journal = {ACM Trans. Intell. Syst. Technol.},
+month = {may},
+articleno = {27},
+numpages = {27},
+keywords = {Classification LIBSVM optimization regression support vector machines SVM}
+}
+
+@inproceedings{p2smo,
+  title={Parallel multiclass classification using SVMs on GPUs},
+  author={Herrero-Lopez, Sergio and Williams, John R and Sanchez, Abel},
+  booktitle={Proceedings of the 3rd Workshop on general-purpose computation on graphics processing units},
+  pages={2--11},
+  year={2010}
+}
+
+@article{gpusvm-s,
+  title={Parallel multitask cross validation for support vector machine using GPU},
+  author={Li, Qi and Salman, Raied and Test, Erik and Strack, Robert and Kecman, Vojislav},
+  journal={Journal of Parallel and Distributed Computing},
+  volume={73},
+  number={3},
+  pages={293--302},
+  year={2013},
+  publisher={Elsevier}
+}
+
+@misc{argparse,
+	author={Pranav and Contributors},
+	title={Argument Parser for Modern C++ code repository},
+	url={https://github.com/p-ranav/argparse},
+}
+
+@misc{iris,
+  author       = {Fisher,R. A.},
+  title        = {{Iris}},
+  year         = {1988},
+  howpublished = {UCI Machine Learning Repository},
+  note         = {{DOI}: https://doi.org/10.24432/C56C76}
 }

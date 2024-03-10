@@ -5,14 +5,12 @@
 <!-- * Σκοπός και Στόχοι -->
 
 
-SVM is a very powerful algorithm used in the classification of both linearly separable and non-linearly separable data, however the computing power required to train an SVM model is high. Many advancements have been made since it's inception [@svm] such as the use of the Sequential Minimal Optimization (SMO) algorithm [@smo], instead of using quadratic programming techniques, and parallelization using PSVM <!-- TODO: reference -->.
-This paper will make an attempt at leveraging the PSVM and other improvements(?) in a heterogeneous CUDA computing environment. This will be achieved by taking advantage of the inherent parallelism present in PSVM due to the division of the dataset into smaller independent subsets which maps very well to the CUDA programming model.
+SVM is a very powerful algorithm used in the classification of both linearly separable and non-linearly separable data, however the computing power required to train an SVM model is high. Many advancements have been made since it's inception [@svm] such as the use of the Sequential Minimal Optimization (SMO) algorithm [@smo], instead of using quadratic programming techniques, and parallelization using PSVM [@psmo].
+This paper will make an attempt at leveraging the PSVM and other improvements in a heterogeneous CUDA computing environment. This will be achieved by taking advantage of the inherent parallelism present in PSVM due to the division of the dataset into smaller independent subsets which maps very well to the CUDA programming model.
 The paper will go over the basics of data classification, existing improvements on SVMs as well as the CUDA programming model.
 It will examine previous work done to improve the efficiency of SVM, including algorithm as well as implementation specific improvements pertaining to CUDA.
-An initial naive non-parallel(?) implementation of SVM will be provided as a benchmark and all steps taken to optimize it will be evaluated for their contribution to the overall speedup.
+An initial naive non-parallel implementation of SVM will be provided as a benchmark and all steps taken to optimize it will be evaluated for their contribution to the overall speedup.
 The main goal of this paper will be the implementation of an efficient parallelized SVM algorithm that will take full advantage of the heterogeneous computing environment it's run on to achieve fast training and prediction times.
-
-<!-- NOTE:  SVMs or SVM -->
 
 
 <!-- * * Ιστορική Αναδρομή ; -->

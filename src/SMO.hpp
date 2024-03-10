@@ -1,6 +1,7 @@
 #ifndef SMO_HPP
 #define SMO_HPP 1
 
+#include <chrono>
 #include <cmath>
 #include <iostream>
 
@@ -39,7 +40,6 @@ math_t Polynomial_Kernel(const vector<math_t>& a, const vector<math_t>& b) {
         res += a[k] * b[k];
     }
     res = gamma + pow(res, degree);
-    // printf("%f\n", res);
     return res;
 }
 
@@ -51,15 +51,11 @@ math_t RBF_Kernel(const vector<math_t>& a, const vector<math_t>& b) {
         res += pow(a[k] - b[k], 2); // squared euclidean distance -> aka sum of square of difference
     }
 
-    // printf("inres = %f\n", res);
     res *= -gamma;
-    // printf("inres = %f\n", res);
     res = exp(res);
-    // printf("inres = %f\n", res);
 
     a.print("a");
     b.print("a");
-    printf("res = %f\n", res);
     return res;
 }
 class SMO {
@@ -89,16 +85,8 @@ class SMO {
           tol(params.tolerance),
           diff_tol(params.diff_tolerance) {
 
-        // w.set(1); // ERROR: watch out
-        w.set(types::epsilon);
-        // for (idx i = 0; i < w.cols; i++) {
-        //     this->w[i] = (rand() % 10) - 5 / static_cast<number>(2);
-        // }
-
+        this->w.set(types::epsilon);
         this->a.set(0);
-        // for (idx i = 0; i < a.cols; i++) {
-        //     a[i] = (rand() % 10) - 5 / (f64)2;
-        // }
 
         // initilize error
         for (idx i = 0; i < error.cols; i++) {
@@ -106,7 +94,6 @@ class SMO {
         }
     }
 
-    // TODO: caching
     math_t Kernel(const vector<math_t>& v, const vector<math_t>& u) {
         switch (kernel_type) {
         case LINEAR:
@@ -124,7 +111,9 @@ class SMO {
         }
     }
 
-    void train() {
+    float train() {
+        auto start = std::chrono::steady_clock::now();
+
         printf("Training");
         int numChanged = 0;
         int examineAll = true;
@@ -133,7 +122,7 @@ class SMO {
         // REF: https://github.com/itsikad/svm-smo/blob/main/src/smo_optimizer.py#L231
         while (numChanged > 0 || examineAll) {
             if (epochs % 100 == 0) {
-                printf(".");
+                printf(".\n");
                 std::flush(std::cout);
             }
             if (false && epochs && epochs % 1000 == 0) {
@@ -146,7 +135,6 @@ class SMO {
                 printf("\nContinue training? [Y/n]\n");
                 printf("Already trained for %d epochs.\n", epochs);
                 printf("Average error on training set: %f\n", avg_error);
-                // printd(w);
                 int c = getchar();
                 if (c == 'n') {
                     puts("Quit training!");
@@ -179,8 +167,6 @@ class SMO {
                 puts("None changed, so examine all!");
                 examineAll = true;
             }
-            // printd(w);
-            // printd(b);
             epochs++;
             if (epochs >= 10000) {
                 puts("Max iteration limit reached!");
@@ -188,6 +174,9 @@ class SMO {
             }
         }
         printf("Done!\nTrained for %d epochs.\n", epochs);
+        auto end = std::chrono::steady_clock::now();
+        float elapsed_seconds = std::chrono::duration_cast<std::chrono::duration<float>>(end - start).count();
+        return elapsed_seconds;
     }
 
     int examineExample(idx i2) {
@@ -241,8 +230,6 @@ class SMO {
                         return 1;
                     }
                 } while (i1 = (i1 + 1) % a.cols, iters++, iters < a.cols);
-                // printf("%d\n", iters);
-                // printf("%d\n", i1);
             }
 
             {
@@ -260,15 +247,6 @@ class SMO {
             }
         }
 
-        // printf("%zu\n", i2);
-        // puts("    within tol");
-        // if ((r2 < -tol && a[i2] < C) || (r2 > tol && a[i2] > 0))
-        // printd(r2);
-        // printd(-a[i2]);
-        // printd(tol);
-        // printd(C);
-        // // printd(a);
-        // printd(w);
         return 0;
     }
 
@@ -283,15 +261,9 @@ class SMO {
             L = max(0, a[i2] - a[i1]);
             H = min(C, C + a[i2] - a[i1]);
         } else {
-            // printf("L = max(0, %f)\n", a[i1] + a[i2] - C);
-            // printf("H = min(%f, %f)\n", C, a[i1] + a[i2]);
             L = max(0, a[i1] + a[i2] - C);
             H = min(C, a[i1] + a[i2]);
         }
-        // printf("      ");
-        // printd(L);
-        // printf("      ");
-        // printd(H);
         if (fabs(H - L) < types::epsilon) {
             // puts("      Low equals High");
             return 0;
@@ -300,19 +272,15 @@ class SMO {
         // second derivative (f'')
         math_t eta = 2 * Kernel(x[i1], x[i2]) - Kernel(x[i1], x[i1]) - Kernel(x[i2], x[i2]);
 
-        // printd(eta);
         math_t a_1 = 0, a_2 = 0;
         if (eta < 0) { // if ("under usual circumstances") eta is negative
             // puts("      by error");
             // error on training examples i_1 and i_2
             math_t E1 = error[i1];
             math_t E2 = error[i2];
-            // printd(E1);
-            // printd(E2);
 
             // new a_2
             a_2 = a[i2] - (y[i2] * (E1 - E2)) / eta + types::epsilon;
-            // printd(a_2);
 
             // clip a_2
             if (a_2 > H) {
@@ -320,7 +288,6 @@ class SMO {
             } else if (a_2 < L) {
                 a_2 = L;
             }
-            // printd(a_2);
         } else {
             // TODO: eq 12.21 again for = f^{old}(x_i) ...
             // puts("      by objective eval");
@@ -328,8 +295,6 @@ class SMO {
             return 0;
             auto WL = eval_objective_func_at(i1, i2, L);
             auto WH = eval_objective_func_at(i1, i2, H);
-            // printd(WL);
-            // printd(WH);
 
             if (WL > WH) {
                 a_2 = WL;
@@ -346,25 +311,15 @@ class SMO {
         }
 
         // puts("      changed\n");
-        // printd(a[i1]);
-        // printd(a_1);
 
         a[i1] = a_1;
         a[i2] = a_2;
-        // printf("      ");
-        // printd(a_1);
-        // printf("      ");
-        // printd(a_2);
-
-        // printd(a);
         compute_w();
         b = compute_b();
 
         error[i1] = predict_on(i1) - y[i1];
         error[i2] = predict_on(i2) - y[i2];
 
-        // printd(w);
-        // printd(b);
         return 1;
     }
 
@@ -531,7 +486,6 @@ class SMO {
             puts("==========");
             printf("%zu\n", i);
             auto example = x[i];
-            // printd(example);
             // for (idx j = 0; j < example.cols; j++) {
             //     res += w[j] * example[j] + b;
             // }
@@ -549,14 +503,6 @@ class SMO {
         math_t accuracy = (correct) / static_cast<math_t>(correct + wrong);
         printf("acc %lf\n", accuracy);
 
-        // printf("a:   %p\n", &a);
-        // printf("w:       %p\n", &w);
-        // printf("indexes: %p\n", &indexes);
-        // printf("x:       %p\n", &x);
-        // printf("y:       %p\n", &y);
-        // printf("d.x:     %p\n", &data.X);
-        // printf("d.y:     %p\n", &data.Y);
-        // printf("example: %p\n", &example);
     }
 };
 

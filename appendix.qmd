@@ -1,0 +1,878 @@
+# Appendix {#sec:appendix .unnumbered}
+
+\AddToHookNext{env/verbatim/begin}{\tiny}
+```{#lst-vector .cpp lst-cap="Generic Vector Implementation"}
+#include <assert.h>
+#include <functional>
+
+#include <cooperative_groups.h>
+
+#include "cuda_helpers.h"
+#include "types.hpp"
+
+namespace cg = cooperative_groups;
+
+using cg::grid_group;
+using cg::this_grid;
+using cg::this_thread_block;
+using cg::thread_block;
+
+namespace types {
+
+template <typename T>
+struct cuda_vector;
+
+template <typename T>
+struct base_vector {
+    idx cols;
+    T* data;
+    bool view = false;
+
+    __host__ __device__ base_vector() : cols(0), data(nullptr), view(false) {}
+
+    __host__ __device__ base_vector(T* start, T* end) : cols(end - start), data(start), view(true) {}
+
+    __host__ __device__ base_vector(idx _cols) : cols(_cols), data(nullptr), view(false) {}
+
+    __host__ __device__ T& operator[](idx i) {
+        if (i >= this->cols) {
+            printf("i:%lu, cols %lu\n", i, this->cols);
+        }
+        assert(i < this->cols);
+        return this->data[i];
+    }
+
+    __host__ __device__ T& operator[](idx i) const {
+        if (i >= this->cols) {
+            printf("i:%lu, cols %lu\n", i, this->cols);
+        }
+        assert(i < this->cols);
+        return this->data[i];
+    }
+
+    __host__ __device__ T* begin() { return this->data; }
+    __host__ __device__ T* end() { return this->data + this->cols - 1; }
+
+    void set(T value) {
+        for (idx i = 0; i < this->cols; i++) {
+            this->data[i] = value;
+        }
+    }
+
+    __host__ void mutate(std::function<T(T)> func) {
+        for (idx i = 0; i < this->cols; i++) {
+            this->data[i] = func(this->data[i]);
+        }
+    }
+    __host__ __device__ void print(const char* msg) const;
+};
+```
+
+\AddToHookNext{env/verbatim/begin}{\tiny}
+```{#lst-vector2 .cpp lst-cap="Generic Vector Implementation cont."}
+template <typename T = math_t>
+struct vector : public base_vector<T> {
+
+    vector() = delete;
+
+    // sized constructor
+    vector(idx _cols)
+        : base_vector<T>(_cols) {
+        this->data = new T[this->cols];
+    }
+
+    vector(T* start, T* end)
+        : base_vector<T>(start, end) {}
+
+    // move constructor
+    vector(vector&& other)
+        : base_vector<T>(other.cols) { // TODO: check if base_vector() is called automagically
+                                       // DONE: it is
+        *this = std::move(other);
+    }
+    // move assignment
+    vector& operator=(vector&& other) {
+        // puts("vector<T>::move");
+        // printf("addr %p\n", this);
+        assert(other.view == false);
+        delete[] this->data;
+        this->data = other.data;
+        this->cols = other.cols;
+        other.data = nullptr;
+        other.cols = 0;
+        return *this;
+    }
+
+    // copy constructor
+    vector(vector& other)
+        : base_vector<T>(other.cols) {
+        // puts("vector<T>::copy const");
+        *this = other;
+    }
+    // copy assignment
+    vector& operator=(vector& other) {
+        // puts("vector<T>::copy assign");
+        if (this->cols != other.cols || this->data == nullptr) { // don't delete[n] just to new[n]
+            delete[] this->data;
+            this->data = new T[other.cols];
+            // printf("%p\n", &this->data);
+            this->cols = other.cols;
+        }
+        memcpy(this->data, other.data, sizeof(T) * other.cols);
+        return *this;
+    }
+
+    // copy conversion constructor
+    vector(cuda_vector<T>& other)
+        : base_vector<T>(other.cols) {
+        *this = other;
+    }
+
+    // copy convert
+    vector<T>& operator=(cuda_vector<T>& other) {
+        if (this->cols != other.cols || this->data == nullptr) {
+            delete[] this->data;
+            this->data = new T[other.cols];
+            this->cols = other.cols;
+        }
+        cudaErr(cudaMemcpy(this->data, other.data, sizeof(T) * other.cols, cudaMemcpyDeviceToHost));
+        return *this;
+    }
+
+    ~vector() {
+        if (!this->view) {
+            delete[] this->data;
+        }
+    }
+};
+```
+
+
+\AddToHookNext{env/verbatim/begin}{\tiny}
+```{#lst-vector3 .cpp lst-cap="Generic Vector Implementation cont."}
+template <typename T>
+struct cuda_vector : public base_vector<T> {
+    // sized constructor
+    cuda_vector(idx _cols)
+        : base_vector<T>(_cols) {
+        cudaErr(cudaMalloc(&this->data, sizeof(T) * this->cols));
+    }
+    __host__ __device__ cuda_vector(T* start, T* end)
+        : base_vector<T>(start, end) {}
+    // move constructor
+    cuda_vector(cuda_vector&& other) {
+        *this = std::move(other);
+    }
+    // move assignment
+    cuda_vector& operator=(cuda_vector&& other) {
+        assert(other.view == false);
+        cudaErr(cudaFree(this->data));
+        this->data = other.data;
+        this->cols = other.cols;
+        other.data = nullptr;
+        other.cols = 0;
+        return *this;
+    }
+
+    // copy constructor
+    cuda_vector(cuda_vector& other)
+        : base_vector<T>(other.cols) {
+        *this = other;
+    }
+    // copy assignment
+    cuda_vector& operator=(cuda_vector& other) {
+        // puts("vector<T>::copy");
+        if (this->cols != other.cols || this->data == nullptr) { // don't delete[n] just to new[n]
+            cudaErr(cudaFree(this->data));
+            cudaErr(cudaMalloc(&this->data, sizeof(T) * other.cols));
+            // printf("%p\n", &this->data);
+            this->cols = other.cols;
+        }
+        cudaErr(cudaMemcpy(this->data, other.data, sizeof(T) * other.cols, cudaMemcpyDeviceToDevice));
+        return *this;
+    }
+
+    // copy conversion constructor
+    cuda_vector(vector<T>& other)
+        : base_vector<T>(other.cols) {
+        *this = other;
+    }
+
+    // conversion
+    cuda_vector& operator=(vector<T>& other) {
+        if (this->cols != other.cols || this->data == nullptr) {
+            cudaErr(cudaFree(this->data));
+            cudaErr(cudaMalloc(&this->data, sizeof(T) * other.cols));
+            this->cols = other.cols;
+        }
+        cudaErr(cudaMemcpy(this->data, other.data, sizeof(T) * other.cols, cudaMemcpyHostToDevice));
+        return *this;
+    }
+
+    __host__ __device__ ~cuda_vector() {
+#ifndef __CUDA_ARCH__
+        if (!this->view) {
+            cudaErr(cudaFree(this->data));
+        }
+#endif
+    }
+```
+
+\AddToHookNext{env/verbatim/begin}{\tiny}
+```{#lst-vector4 .cpp lst-cap="Generic Vector Implementation cont."}
+
+    template <class F>
+    __device__ void mutate(F func) {
+        unsigned int tid = blockDim.x * blockIdx.x + threadIdx.x;
+        unsigned int stride = blockDim.x * gridDim.x;
+        grid_group grid = this_grid();
+
+        for (idx i = tid; i < this->cols; i += stride) {
+            this->data[i] = func(i);
+        }
+        grid.sync();
+    }
+
+    __device__ void set(T value) {
+        unsigned int tid = blockDim.x * blockIdx.x + threadIdx.x;
+        unsigned int stride = blockDim.x * gridDim.x;
+        grid_group grid = this_grid();
+
+        // if (tid == 0)
+        //     printf("[%d]: [%p] = value \n", tid, this);
+        // printf("[%d]: [%i] = value \n", tid, this->cols);
+        for (idx i = tid; i < this->cols; i += stride) {
+            // if (tid == 0)
+            //     printf("[%d]: set [%i] = value \n", tid, i);
+            this->data[i] = value;
+        }
+        grid.sync();
+    }
+};
+
+typedef math_t (*Kernel)(base_vector<math_t>, base_vector<math_t>);
+
+// using Kernel = std::function<number(vector<number>, vector<number>)>;
+
+template <>
+inline void base_vector<int>::print(const char* msg) const {
+    for (idx i = 0; i < this->cols; i++) {
+        printf("%s[%zu]: %*d\n", msg, i, PRINT_DIGITS, this->data[i]);
+    }
+}
+
+template <>
+inline void base_vector<double>::print(const char* msg) const {
+    for (idx i = 0; i < this->cols; i++) {
+        printf("%s[%zu]: %*.*f\n", msg, i, PRINT_DIGITS, PRINT_AFTER, this->data[i]);
+    }
+}
+
+template <typename T>
+void _printd(base_vector<T>& vec, const char* msg) {
+    vec.print(msg);
+}
+
+} // namespace types
+#endif
+```
+
+\AddToHookNext{env/verbatim/begin}{\tiny}
+```{#lst-matrix .cpp lst-cap="Generic Matrix Implementation"}
+#ifndef MATRIX_HPP
+#define MATRIX_HPP 1
+
+#include "types.hpp"
+#include "vector.hpp"
+
+namespace types {
+
+template <typename T>
+struct cuda_matrix;
+
+template <typename T>
+struct base_matrix {
+    idx rows;
+    idx cols;
+    T* data;
+    base_matrix()
+        : rows(0),
+          cols(0),
+          data(nullptr) {}
+    base_matrix(idx _rows, idx _cols)
+        : rows(_rows),
+          cols(_cols),
+          data(nullptr) {}
+
+    T* begin() {
+        return this->data;
+    }
+
+    T* end() {
+        return this->data + rows * cols;
+    }
+
+    auto shape() {
+        return std::make_tuple(rows, cols);
+    }
+};
+```
+
+\AddToHookNext{env/verbatim/begin}{\tiny}
+```{#lst-matrix2 .cpp lst-cap="Generic Matrix Implementation cont."}
+template <typename T>
+struct matrix : public base_matrix<T> {
+
+    // sized constructor
+    matrix(idx _rows, idx _cols)
+        : base_matrix<T>(_rows, _cols) {
+        this->data = new T[_cols * _rows];
+    }
+    // move constructor
+    matrix(matrix&& other)
+        : base_matrix<T>(other.rows, other.cols) {
+        *this = std::move(other);
+    }
+
+    // move assignment
+    matrix& operator=(matrix&& other) {
+        delete[] this->data;
+        this->data = other.data;
+        this->cols = other.cols;
+        this->rows = other.rows;
+        other.data = nullptr;
+        return *this;
+    }
+
+    matrix(matrix& other)
+        : base_matrix<T>(other.rows, other.cols) {
+        *this = other;
+    }
+
+    matrix& operator=(matrix& other) {
+        if (this->cols * this->rows != other.cols * other.rows) {
+            delete[] this->data;
+            this->data = new T[other.cols * other.rows];
+            this->cols = other.cols;
+            this->rows = other.cols;
+        }
+        memcpy(this->data, other.data, other.rows * other.cols * sizeof(T));
+        return *this;
+    }
+
+    matrix(cuda_matrix<T>& other)
+        : base_matrix<T>(other.rows, other.cols) {
+        *this = other;
+    }
+
+    matrix& operator=(cuda_matrix<T>& other) {
+        if (this->cols * this->rows != other.cols * other.rows || this->data == nullptr) {
+            free(this->data);
+            this->data = new T[other.cols * other.rows];
+            this->cols = other.cols;
+            this->rows = other.rows;
+        }
+        cudaErr(cudaMemcpy(this->data, other.data, sizeof(T) * other.cols * other.rows, cudaMemcpyDeviceToHost));
+        return *this;
+    }
+
+    ~matrix() {
+        // printf("~matrix: %p\n", this);
+        delete[] this->data;
+    }
+
+    // returns a vector which does not deallocate it's data, since it's owned by this matrix
+    vector<T> operator[](idx index) {
+        assert(index < this->rows);
+        return vector<T>(&(this->data[index * this->cols]), &(this->data[index * this->cols + this->cols]));
+    }
+    vector<T> operator[](idx index) const {
+        assert(index < this->rows);
+        return vector<T>(&(this->data[index * this->cols]), &(this->data[index * this->cols + this->cols]));
+    }
+
+    void print() {
+        for (idx i = 0; i < this->rows; i++) {
+            for (idx j = 0; j < this->cols; j++) {
+                printf("%*.*f ", PRINT_DIGITS, PRINT_AFTER, this->data[i * this->cols + j]);
+            }
+            puts("");
+        }
+    }
+};
+```
+
+\AddToHookNext{env/verbatim/begin}{\tiny}
+```{#lst-matrix3 .cpp lst-cap="Generic Matrix Implementationt cont."}
+template <typename T>
+void inline _printd(matrix<T>& mat, const char* msg) {
+    puts(msg);
+    mat.print();
+}
+
+template <typename T>
+struct cuda_matrix : base_matrix<T> {
+
+    // sized constructor
+    cuda_matrix(idx _rows, idx _cols)
+        : base_matrix<T>(_rows, _cols) {
+        cudaErr(cudaMalloc(&this->data, sizeof(T) * _cols * _rows));
+    }
+    // move constructor
+    cuda_matrix(matrix<T>&& other)
+        : base_matrix<T>(other.rows, other.cols) {
+        *this = std::move(other);
+    }
+
+    // move assignment
+    cuda_matrix& operator=(matrix<T>&& other) {
+        cudaErr(cudaFree(this->data));
+        this->data = other.data;
+        this->cols = other.cols;
+        this->rows = other.rows;
+        other.data = nullptr;
+        return *this;
+    }
+
+    cuda_matrix(matrix<T>& other)
+        : base_matrix<T>(other.rows, other.cols) {
+        *this = other;
+    }
+
+    cuda_matrix& operator=(matrix<T>& other) {
+        if (this->cols * this->rows != other.cols * other.rows || this->data == nullptr) {
+            cudaErr(cudaFree(this->data));
+            cudaErr(cudaMalloc(&this->data, sizeof(T) * other.cols * other.rows));
+            this->cols = other.cols;
+            this->rows = other.rows;
+        }
+        cudaErr(cudaMemcpy(this->data, other.data, sizeof(T) * other.cols * other.rows, cudaMemcpyHostToDevice));
+        return *this;
+    }
+
+    ~cuda_matrix() {
+        // printf("~matrix: %p\n", this);
+        cudaErr(cudaFree(this->data));
+    }
+
+    // returns a vector which does not deallocate it's data, since it's owned by this cuda_matrix
+    __device__ cuda_vector<T> operator[](idx index) {
+        return cuda_vector<T>(&(this->data[index * this->cols]), &(this->data[index * this->cols + this->cols]));
+    }
+    __device__ cuda_vector<T> operator[](idx index) const {
+        return cuda_vector<T>(&(this->data[index * this->cols]), &(this->data[index * this->cols + this->cols]));
+    }
+};
+
+} // namespace types
+#endif
+```
+
+\AddToHookNext{env/verbatim/begin}{\tiny}
+```{#lst-smo-outer .cpp lst-cap="SMO Implementation Outer Loop"}
+while (numChanged > 0 || examineAll) {
+	if (epochs % 100 == 0) {
+		printf(".\n");
+		std::flush(std::cout);
+	}
+	if (false && epochs && epochs % 1000 == 0) {
+		math_t avg_error = 0;
+		for (auto e : error) {
+			avg_error += e;
+		}
+		avg_error = avg_error / static_cast<math_t>(error.cols);
+
+		printf("\nContinue training? [Y/n]\n");
+		printf("Already trained for %d epochs.\n", epochs);
+		printf("Average error on training set: %f\n", avg_error);
+		int c = getchar();
+		if (c == 'n') {
+			puts("Quit training!");
+			break;
+		}
+		if (c != '\n') {
+			getchar();
+		}
+	}
+	numChanged = 0;
+
+	if (examineAll) {
+		// puts("examine all");
+		// loop i_1 over all training examples
+		for (idx i2 = 0; i2 < x.rows; i2++) {
+			numChanged += examineExample(i2);
+		}
+	} else {
+		// puts("examine some");
+		// loop i_1 over examples for which alpha is nor 0 nor Cost
+		for (idx i2 = 0; i2 < x.rows; i2++) {
+			if (a[i2] != 0.0 || a[i2] != C) {
+				numChanged += examineExample(i2);
+			}
+		}
+	}
+	if (examineAll) {
+		examineAll = false;
+	} else if (numChanged == 0) {
+		puts("None changed, so examine all!");
+		examineAll = true;
+	}
+	epochs++;
+	if (epochs >= 10000) {
+		puts("Max iteration limit reached!");
+		break;
+	}
+}
+printf("Done!\nTrained for %d epochs.\n", epochs);
+auto end = std::chrono::steady_clock::now();
+float elapsed_seconds = std::chrono::duration_cast<std::chrono::duration<float>>(end - start).count();
+return elapsed_seconds;
+```
+
+\AddToHookNext{env/verbatim/begin}{\tiny}
+```{#lst-smo-inner .cpp lst-cap="SMO Implementation Inner Loop"}
+int examineExample(idx i2) {
+	// printf("examine example %zu\n", i2);
+
+	// lookup error E2 for i_2 in error cache
+	math_t E2 = error[i2];
+
+	math_t r2 = E2 * y[i2];
+
+	// if the error is within tolerance and the a is outside of (0, C)
+	// don't change anything for this i_2
+	if ((r2 < -tol && a[i2] < C) || (r2 > tol && a[i2] > 0)) {
+		// number of non-zero & non-C alphas
+		int non_zero_non_c = 0;
+		for (idx i = 0; i < a.cols; i++) {
+			if (a[i] < types::epsilon || fabs(a[i] - C) < types::epsilon) {
+				continue;
+			}
+			non_zero_non_c++;
+			if (non_zero_non_c > 1) { // no need to count them all
+				break;
+			}
+		}
+		if (non_zero_non_c > 1) {
+			idx i1 = second_choice_heuristic(E2);
+			if (takeStep(i1, i2) == 1) {
+				return 1;
+			}
+		}
+
+		// in the following 2 scopes
+		// iters makes sure we go over all i_1
+		// i_1 is the current i_1, starting from a random one, increasing until starting_i_1 - 1
+		// i_1 wraps around if > a.cols
+
+		// loop i_1 over all non-zero non-C a, starting at random point
+		{
+
+			idx iters = 0;
+			idx i1 = 0;
+			do {
+				i1 = static_cast<idx>(rand()) % a.cols;
+			} while (i1 == i2);
+
+			do {
+				if (fabs(a[i1]) < types::epsilon || fabs(a[i1] - C) < types::epsilon) {
+					continue;
+				}
+				if (takeStep(i1, i2) == 1) {
+					return 1;
+				}
+			} while (i1 = (i1 + 1) % a.cols, iters++, iters < a.cols);
+		}
+
+		{
+			idx iters = 0;
+			idx i1 = 0;
+			do {
+				i1 = static_cast<idx>(rand()) % a.cols;
+			} while (i1 == i2);
+
+			do {
+				if (takeStep(i1, i2) == 1) {
+					return 1;
+				}
+			} while (i1 = (i1 + 1) % a.cols, iters++, iters < a.cols);
+		}
+	}
+
+	return 0;
+}
+```
+
+\AddToHookNext{env/verbatim/begin}{\tiny}
+```{#lst-smo-step .cpp lst-cap="SMO Implementation Step"}
+int takeStep(idx i1, idx i2) {
+	// getchar();
+	// printf("    takeStep %zu %zu\n", i1, i2);
+	math_t sign = y[i1] * y[i2];
+	math_t L = 0, H = 0;
+
+	// find low and high
+	if (y[i1] != y[i2]) {
+		L = max(0, a[i2] - a[i1]);
+		H = min(C, C + a[i2] - a[i1]);
+	} else {
+		L = max(0, a[i1] + a[i2] - C);
+		H = min(C, a[i1] + a[i2]);
+	}
+	if (fabs(H - L) < types::epsilon) {
+		// puts("      Low equals High");
+		return 0;
+	}
+
+	// second derivative (f'')
+	math_t eta = 2 * Kernel(x[i1], x[i2]) - Kernel(x[i1], x[i1]) - Kernel(x[i2], x[i2]);
+
+	math_t a_1 = 0, a_2 = 0;
+	if (eta < 0) { // if ("under usual circumstances") eta is negative
+		// puts("      by error");
+		// error on training examples i_1 and i_2
+		math_t E1 = error[i1];
+		math_t E2 = error[i2];
+
+		// new a_2
+		a_2 = a[i2] - (y[i2] * (E1 - E2)) / eta + types::epsilon;
+
+		// clip a_2
+		if (a_2 > H) {
+			a_2 = H;
+		} else if (a_2 < L) {
+			a_2 = L;
+		}
+	} else {
+		// TODO: eq 12.21 again for = f^{old}(x_i) ...
+		// puts("      by objective eval");
+		// puts("      skipping..");
+		return 0;
+		auto WL = eval_objective_func_at(i1, i2, L);
+		auto WH = eval_objective_func_at(i1, i2, H);
+
+		if (WL > WH) {
+			a_2 = WL;
+		} else {
+			a_2 = WH;
+		}
+	}
+	a_1 = a[i1] + sign * (a[i2] - a_2);
+
+	// if the difference is small, don't bother
+	if (fabs(a[i1] - a_1) < diff_tol) {
+		// puts("small diff");
+		return 0;
+	}
+
+	// puts("      changed\n");
+
+	a[i1] = a_1;
+	a[i2] = a_2;
+	compute_w();
+	b = compute_b();
+
+	error[i1] = predict_on(i1) - y[i1];
+	error[i2] = predict_on(i2) - y[i2];
+
+	return 1;
+}
+```
+
+\AddToHookNext{env/verbatim/begin}{\tiny}
+```{#lst-my-reduce .cpp lst-cap="GPUSVM Grid Reduction"}
+__device__ idx_tuple argMin(size_t shared_halfpoint) {
+	unsigned int tid = blockDim.x * blockIdx.x + threadIdx.x;
+	unsigned int stride = blockDim.x * gridDim.x;
+	thread_block threads = this_thread_block();
+	grid_group blocks = this_grid();
+
+	extern __shared__ char shared_memory[];
+
+	idx* sindx = reinterpret_cast<idx*>(shared_memory);
+	math_t* sdata = reinterpret_cast<math_t*>(shared_memory + (sizeof(idx) * shared_halfpoint));
+
+	__shared__ math_t block_max;
+	__shared__ idx block_max_i;
+	__shared__ math_t block_min;
+	__shared__ idx block_min_i;
+	// init block locals
+	if (threadIdx.x == 0) {
+		block_max = -types::MATH_T_MAX;
+		block_max_i = 0;
+		block_min = +types::MATH_T_MAX;
+		block_min_i = 0;
+	}
+
+	math_t cur_max;
+	math_t cur_min;
+	idx min_i = tid;
+	idx max_i = tid;
+	if (tid < a.cols) {
+		cur_min = a[tid];
+		// thread local arg min|max
+		for (idx i = tid + stride; i < a.cols; i += stride) {
+			// TODO: Take into account indices up, low and both
+			auto kind = indices[i];
+			auto tmp = a[i]; // save to local, so it's accessed only once
+			if (kind == UP || kind == BOTH) {
+				if (tmp < cur_min) {
+					cur_min = tmp;
+					min_i = i;
+				}
+			}
+			if (kind == LOW || kind == BOTH) {
+				if (tmp > cur_min) {
+					cur_max = tmp;
+					max_i = i;
+				}
+			}
+		}
+	} else {
+		cur_max = -types::MATH_T_MAX;
+		cur_min = +types::MATH_T_MAX;
+	}
+
+	// load into to block shared memory
+	sdata[threadIdx.x] = cur_min;
+	sindx[threadIdx.x] = min_i;
+	sdata[threadIdx.x + blockDim.x] = cur_max;
+	sindx[threadIdx.x + blockDim.x] = max_i;
+	threads.sync();
+
+	// block reduce into sdata[0] and sindx[0]
+	for (idx offset = 1; offset < blockDim.x; offset *= 2) {
+		idx index = 2 * offset * threadIdx.x;
+
+		if (index < blockDim.x) {
+			// min
+			if (sdata[index + offset] < sdata[index]) {
+				sdata[index] = sdata[index + offset];
+				sindx[index] = sindx[index + offset];
+			}
+			// max (stored offset by blockDim.x)
+			if (sdata[blockDim.x + index + offset] > sdata[blockDim.x + index]) {
+				sdata[blockDim.x + index] = sdata[blockDim.x + index + offset];
+				sindx[blockDim.x + index] = sindx[blockDim.x + index + offset];
+			}
+		}
+	}
+```
+
+\AddToHookNext{env/verbatim/begin}{\tiny}
+```{#lst-my-reduce2 .cpp lst-cap="GPUSVM Grid Reduction cont."}
+	threads.sync();
+	// write block result to device global
+	if (threadIdx.x == 0) {
+		ddata[blockIdx.x] = sdata[0];
+		dindx[blockIdx.x] = sindx[0];
+		ddata[blockDim.x + blockIdx.x] = sdata[blockDim.x + 0];
+		dindx[blockDim.x + blockIdx.x] = sindx[blockDim.x + 0];
+	}
+
+	blocks.sync();
+
+	// perform reduction of block results,
+	// like above but for block results :^)
+	if (blockIdx.x == 0) {
+		// copy device globals to block shared memory
+		if (threadIdx.x < gridDim.x) {
+			sdata[threadIdx.x] = ddata[threadIdx.x];
+			sindx[threadIdx.x] = dindx[threadIdx.x];
+			sdata[blockDim.x + threadIdx.x] = ddata[blockDim.x + threadIdx.x];
+			sindx[blockDim.x + threadIdx.x] = dindx[blockDim.x + threadIdx.x];
+		}
+		threads.sync();
+		for (idx offset = 1; offset < blockDim.x; offset *= 2) {
+			idx index = 2 * offset * threadIdx.x;
+
+			if (index < blockDim.x) {
+				if (sdata[index + offset] < sdata[index]) {
+					sdata[index] = sdata[index + offset];
+					sindx[index] = sindx[index + offset];
+				}
+				if (sdata[blockDim.x + index + offset] > sdata[blockDim.x + index]) {
+					sdata[blockDim.x + index] = sdata[blockDim.x + index + offset];
+					sindx[blockDim.x + index] = sindx[blockDim.x + index + offset];
+				}
+			}
+		}
+		threads.sync();
+	}
+
+	// write to global memory
+	if (blockIdx.x + threadIdx.x == 0) { // will the real tid 0 plz stand up
+		dindx[0] = sindx[0];
+		dindx[1] = sindx[blockDim.x + 0];
+	}
+
+	blocks.sync();
+
+	return {.a = dindx[0], .b = dindx[1]};
+}
+```
+
+
+\AddToHookNext{env/verbatim/begin}{\tiny}
+```{#lst-blob .python lst-cap="Linearly separable dataset generation script"}
+#!/usr/bin/env python3
+# import libraries
+from sklearn.datasets import make_blobs
+import matplotlib.pyplot as plt
+import sys
+
+sizes = {
+        "1k": 1000,
+        "10k": 10_000,
+        "100k": 100_000,
+        "1M": 1_000_000,
+}
+
+for name, size in sizes.items():
+    filename= "linear" + name + ".data"
+    print(filename)
+    with open(filename, "w") as sys.stdout:
+        # generate a 2-class classification problem with 1,000 data points,
+        # where each data point is a 2-D feature vector
+        (X, Y) = make_blobs(n_samples=size, n_features=3, centers=2, 
+                        cluster_std=1.5, random_state=1)
+
+        for x, y in zip(X, Y):
+            for v in x:
+                print(str(v) + ";", end='')
+            print(y)
+```
+
+| Execution time in seconds | Samples   | System     | Algorithm   |
+|---------------------------|-----------|------------|-------------|
+| 0.028410                  | 1000      | WSL        | SMO         |
+| 2.828395                  | 10000     | WSL        | SMO         |
+| 296.077942                | 100000    | WSL        | SMO         |
+| 0.178688                  | 1000      | WSL        | GPUSVM      |
+| 0.435904                  | 10000     | WSL        | GPUSVM      |
+| 0.696096                  | 100000    | WSL        | GPUSVM      |
+| 5.249376                  | 1000000   | WSL        | GPUSVM      |
+| 0.023468                  | 1000      | Headless   | SMO         |
+| 2.140797                  | 1000      | Headless   | SMO         |
+| 222.812546                | 10000     | Headless   | SMO         |
+| 0.138688     TEMP DATA    | 1000      | Headless   | GPUSVM      |
+| 0.335904     TEMP DATA    | 10000     | Headless   | GPUSVM      |
+| 0.596096     TEMP DATA    | 100000    | Headless   | GPUSVM      |
+| 5.149376     TEMP DATA    | 1000000   | Headless   | GPUSVM      |
+
+Table: Raw "SMO vs GPUSVM" experimental data
+
+| Execution time in seconds      | Threads | Blocks | System      |
+|--------------------------------|---------|--------|-------------|
+| 34.257954                      | 256     | 10     | WSL         |
+| 26.162336                      | 128     | 30     | WSL         |
+| 25.906273                      | 64      | 60     | WSL         |
+| 34.257954     TEMP DATA        | 256     | 10     | Headless    |
+| 26.162336     TEMP DATA        | 128     | 30     | Headless    |
+| 25.906273     TEMP DATA        | 64      | 60     | Headless    |
+
+Table: Raw "Block x Thread" experimental data
+
+## Full Project
+
+The full project, including the source code, dataset helper scripts and the markdown source of this paper will be available online after publication at [this public repository](https://github.com/cultab/thesis).

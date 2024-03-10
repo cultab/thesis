@@ -1,8 +1,60 @@
 # Implementation
 
-## Serial
+This section will cover two implementations, the serial SMO SVM solver meant to server as a baseline and a parallel GPUSVM-based SVM solver. The implementation was written in C++17 and CUDA 12^[exact cuda version: Cuda compilation tools, release 12.3, V12.3.107 Build cuda_12.3.r12.3/compiler.33567101_0].
 
-## Parallel
+## CLI Interface
+
+The usage of both implementations is done through a Command Line Interface (CLI). The resulting binary can be run as is, to run with the default settings, or it can accept various flags and options.
+
+::: {.callout-note}
+Parsing of the cli arguments was done with the use of the header-only argparse library [@argparse].
+:::
+
+It accepts two positional arguments: `DATASET`, which is the name of the dataset to use, and `ALGO` which indicates whether to run the CPU (Central Processing Unit) algorithm (SMO) or the GPU algorithm (GPUSVM). It accepts three optional arguments, `--threads <integer>`, which controls the number of CUDA threads to be used for the GPU algorithm, `--blocks <integer>`, which controls the number of CUDA blocks to be used, and lastly `--test` which runs a test of the model on the training data, to obtain a prediction accuracy. The usage of the binary, accessible through the flag `--help`, follows in \autoref{lst-help}.
+
+\AddToHookNext{env/verbatim/begin}{\small}
+```{#lst-help .txt lst-cap="Usage of the cli interface"}
+Usage: svm [--help] [--version] [--blocks VAR]
+           [--threads VAR] [--size VAR] [--test] DATASET ALGO
+
+Positional arguments:
+  DATASET        the dataset to use [nargs=0..1] [default: "linear"]
+  ALGO           algorithm to use [nargs=0..1] [default: "cpu"]
+
+Optional arguments:
+  -h, --help     shows help message and exits
+  -v, --version  prints version information and exits
+  -b, --blocks   number of blocks for CUDA [nargs=0..1] [default: 16]
+  --threads      number of threads for CUDA [nargs=0..1] [default: 128]
+  --size         size of the linear DATASET [nargs=0..1] [default: 1000]
+  --test         test the model after training
+```
+
+\newpage
+
+## Serial SMO
+
+The serial implementation is meant to serve as a baseline for benchmarking so it's a faithful implementation of SMO [@smo]. In \autoref{lst-smo-outer} we see the outer loop of the SMO algorithm, the outer loop keeps running until we have examined all examples and changed no multipliers thus made no further progress. In the case where no progress has been made when checking non-bound multipliers, the entire set of multipliers is checked before giving up.
+An iteration limit has also been used to stop training if it has been stuck slowly optimizing a few multipliers. The inner loop in \autoref{lst-smo-inner} implements the second order choice heuristics The `takeStep()` function in \autoref{lst-smo-step} implements the optimization step of SMO. In the case of a negative $\eta$, the chosen multiplier is skipped instead of evaluating the objective function at $L$ and $H$ because in experiments it resulted in reaching the iteration limit due to the algorithm being stuck when a negative $\eta$ was common.
+
+## Parallel GPUSVM
+
+The parallel implementation is heavily based on GPUSVM [@gpusvm] and P-SMO [@psmo]. The main difference when compared to GPUSVM is the use of cooperative kernels and grid synchronization in order to eliminate the need to move data from the host to the device and back at each iteration. Instead a grid wide reduction is implemented to obtain $b_{low}$ and $b_{up}$, seen in \autoref{lst-my-reduce}. The reduction implements the argmin and argmax operation at the same time, returning two results. In the first stage each CUDA thread finds a local max and min, as well as their indices. Next a block reduction is performed to obtain block local results which are then written to global device memory by each thread with `threadIdx.x == 0`. In the final stage a grid synchronization is performed and then the first block, the one with `blockIdx.x == 0`, performs a block reduction of the previously mentioned block local results and the results are written to global memory. Afterwards a grid synchronization is again performed and all threads read the results into their local memory.
+
+Because of the use of cooperative kernels, the optimal number of blocks to use can actually be very easily determined, dynamically. In \autoref{lst-blocks} we see the code used to achieve the optimal SM occupancy, the code is also available on the official CUDA documentation [@cudadocs]. This is done by querying the platform for the maximum number of active blocks per SM that can be used with a specific kernel and a specific number of threads.
+
+\AddToHookNext{env/verbatim/begin}{\tiny}
+```{#lst-blocks .cpp lst-cap="Calculation of optimal number of blocks"}
+/// This will launch a grid that can maximally fill the GPU, on the default stream with kernel arguments
+int numBlocksPerSm = 0;
+// Number of threads my_kernel will be launched with
+cudaGetDeviceProperties(&deviceProp, dev);
+cudaOccupancyMaxActiveBlocksPerMultiprocessor(&numBlocksPerSm, train_CUDA_model, THREADS, 0);
+dim3 dimBlock(THREADS, 1, 1);
+dim3 dimGrid(deviceProp.multiProcessorCount * numBlocksPerSm, 1, 1);
+printf("Using %u blocks!\n", dimGrid.x);
+```
 
 ## Vector Library
 
+In order to better abstract the algorithms as well as to provide code deduplication and promote code reuse between the two implementations, a thin wrapper library over raw C arrays was developed. The library provides generic statically sized vector and matrix types with device and host variants for easy use in both normal C++ code, and CUDA code. Each type resides in their own header files, but the matrix header depends on the vector header. To facilitate further abstraction over raw arrays and avoid error prone manual data moves between host and device, constructors have been implemented that convert from host vectors to CUDA vectors and vice-versa. A useful functional-style `mutate()` method is provided for the vector type, one which accepts a lambda and applies it to each element of the vector, this enabled an easy and less error-prone way to reason about the data contained vectors. The source code for the vector and matrix types is provided in the appendix in \autoref{lst-vector} and \autoref{lst-matrix}.

@@ -16,7 +16,7 @@ NVCCFLAGS := --device-c
 # REF: https://interrupt.memfault.com/blog/best-and-worst-gcc-clang-compiler-flags#-wundef
 # REF: https://developers.redhat.com/blog/2018/03/21/compiler-and-linker-flags-gcc
 
-CFLAGS := --std=c++20 -pipe -fmax-errors=1
+CFLAGS := --std=c++17 -pipe -fmax-errors=1
 # dependency generation
 CFLAGS += -MMD -MP
 
@@ -24,7 +24,8 @@ CFLAGS += --optimization-info inline --generate-line-info -lineinfo
 CFLAGS += -arch=sm_61 -forward-unknown-to-host-compiler --expt-relaxed-constexpr --extended-lambda
 # CFLAGS += -arch=sm_61 -forward-unknown-to-host-compiler
 CFLAGS += -O1
-# CFLAGS += -O2 -free-loop-vectorize
+# CFLAGS += -D__CUDA_NO_HALF_OPERATORS__ -D__CUDA_NO_HALF_CONVERSIONS__ -D__CUDA_NO_HALF2_OPERATORS__ -DCUDA_HAS_FP16=1
+# CFLAGS += -O2 -ftree-loop-vectorize
 ############
 # warnings:#
 ############

@@ -3,14 +3,43 @@ project:
     - Thesis.qmd
 
 title: "Parallel Classification using Support Vector Machines on Modern GPUs"
-author: Ευάγγελος Κατσανδρής (cs171014@uniwa.gr)
 subtitle: |
     | Πανεπιστήμιο Δυτικής Αττικής
     | \includegraphics{./img/logo.jpg}
     | Τμήμα Μηχανικών Πληροφορικής και Υπολογιστών
 date: now
 date-format: dddd MMMM D, YYYY
+# author: Ευάγγελος Κατσανδρής (cs171014@uniwa.gr)
+author:
+  - name: Ευάγγελος Κατσανδρής
+    # id: jc
+    # orcid: 0000-0002-1825-0097
+    email: cs171014@uniwa.gr
+    affiliation: 
+      - name: University of West Attica
+        city: Athens
+        department: Computer Engineering and Informatics
+        # state: RI
+        url: www.uniwa.gr
+# abstract: > 
+#   This is the abstract words. Another sentence.
+# thanks: > 
+#   This is the thanks section. Sentence two!
+license: "CC BY"
+copyright: 
+  holder: Ευάγγελος Κατσανδρής
+  year: 2024
+# citation: 
+#   container-title: Journal of Psychoceramics
+#   volume: 1
+#   issue: 1
+#   doi: 10.5555/12345678
+funding: "The author received no specific funding for this work."
 
+glossary:
+  path: glossary.yml
+  popup: none
+  show: true
 format:
     wordcount-pdf:
         # template: /home/evan/.pandoc/templates/eisvogel.latex
@@ -25,8 +54,8 @@ format:
             - file: macros.tex
         keep-tex: true # ok
         latex-auto-install: false
-        pandoc-args: "--lua filter ./filters/minted.lua"
-        pdf-engine-opt: "-shell-escape"
+        # pandoc-args: "--lua filter ./filters/minted.lua"
+        # pdf-engine-opt: "-shell-escape"
         cite-method: biblatex # ok
         documentclass: scrreprt # ok ?
         # documentclass: report # ok ?
@@ -36,7 +65,7 @@ format:
         mainfont: Liberation Serif # ok
         sansfont: Liberation Sans # ok
         # monofont: Source Code Pro # ok
-        monofont: Monaspace Argon
+        monofont: Monaspace Neon
         linestretch: 1.5 # ok
         linkcolor: uniwablue
         urlcolor: uniwablue

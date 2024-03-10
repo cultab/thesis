@@ -330,9 +330,9 @@ x \mapsto \phi(x) \in H
 \end{equation}
 where $H$ is a Hilbert space. The inner product operation has an equivalent representation.
 \begin{equation}
-<\phi(x),\phi(z)> = K(x,z)
+\langle\phi(x),\phi(z)\rangle = K(x,z)
 \end{equation}
-where $<\cdot,\cdot>$ denotes the inner product operation in $H$ and $K(x,z)$ is a symmetric continuous function satisfying the following conditions (known as Mercer's conditions):
+where $\langle\cdot,\cdot\rangle$ denotes the inner product operation in $H$ and $K(x,z)$ is a symmetric continuous function satisfying the following conditions (known as Mercer's conditions):
 \begin{equation}
 \int_C \int_C K(x,z)g(x)g(z)dx dz \geq 0
 \end{equation}
@@ -368,13 +368,16 @@ w =& \sum_{i=1}^n a_i y_i \phi(x_i)
 
 There are many kernels that are used with SVM:
 
-* Linear kernel: $<x,\prime(x)>$
+|  Name                                | Kernel                                        |
+|--------------------------------------|-----------------------------------------------|
+| Linear Kernel                        |  $\langle x,x\prime \rangle$                  |
+| Polynomial Kernel                    |  $(\gamma\langle x,x\prime \rangle + r)^d$    |
+| Exponential Kernel                   |  $exp(-\gamma||x-x\prime||^2)$                |
+| Radial Basis Function                |  $exp(-\gamma ||x — x\prime||^2)$             |
 
-* Polynomial kernel: $(\gamma<x,\prime(x)> + r)^d$ where $d$ is the degree of the polynomial and $r$, $\gamma$ bias parameters.
+Table: Kernels used with SVM
 
-* Exponential kernel: $exp(-\gamma||x-\prime(x)||^2)$, where $\gamma$ is a bias term.
-
-* Radial Basis Function (RBF) kernel: $exp(-\gamma ||x — x\prime||^2)$, where $\gamma$ is a bias term.
+Where $d$ is the degree of the polynomial and $r$, $\gamma$ are bias parameters.
 
 #### Regularisation
 
@@ -471,7 +474,7 @@ Subject to:
 The kernel trick from \numnameref{sec:kernel}, still applies.
 :::
 
-## Sequential Minimization Optimization
+## Sequential Minimization Optimization {#sec:smo}
 
 The dual form we have derived in \autoref{eq:dual_final}, as well as the kernelized form in \autoref{eq:dual_kernel} can be solved using standard quadratic programming (QP) solvers. Using those can be very performance and memory intensive. For that reason many techniques where developed to speed up SVM. One of the more successful ones was Sequential Minimization Optimization (SMO) which takes the relatively large QP problem of SVM, breaks it into many smaller ones, and solves them analytically [@smo]. For each optimization step due to the linear constraint in \autoref{eq:lincon}, two Lagrange multipliers are jointly optimized at a time.
 
@@ -481,7 +484,7 @@ More specifically a high level overview of how the SMO algorithm works is as fol
 
 2. Pick a second Lagrange multiplier $a_2$ to optimize, using the Second Choice Heuristic.
 
-3. Calculate the prediction error $E_i = \text{Output of SVM on point i} - y_i$ for the first and second multiplier.
+3. Calculate the prediction error $E_i = \text{Output of SVM on point i} - y_i$ for the first multiplier.
 
 4. Using the prediction errors, perform what is essentially coordinate descend [@coordinate, page 11], to move both multipliers closer to their optimal value.
 
@@ -489,5 +492,6 @@ More specifically a high level overview of how the SMO algorithm works is as fol
 
 The First Choice Heuristic attempts to find a Lagrange multiplier that violates the KKT conditions. To speed up the training multipliers that are bounded^[bounded multipliers: when $a_i \neq C,\; a_i \neq 0$] are ignored --except if a full pass over the training set has not found a violating multiplier. In this case a full pass over all multipliers is done to find violating ones.
 
-The Second Choice Heuristic attempts to find a second Lagrange multiplier, one that maximises the absolute value of the prediction error on the samples $i_1$ and $i_2$.
+The Second Choice Heuristic attempts to find a second Lagrange multiplier, $a_2$, one that maximises the absolute value of the prediction error on the samples $i_1$ and $i_2$ given an already decided $i_1$.
 
+<!-- TODO: expand upon a_2 new = a old - y2 (E1 - E2) blah blah -->

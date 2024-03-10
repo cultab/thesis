@@ -3,7 +3,7 @@
 
 Classification is the process of assigning a class label to each sample of a dataset, an algorithm that classifies data is called a Classifier. Classification has a wide range of applications ranging from medical diagnosis [@medical] to natural language processing [@text] and building recognition from aerial photography [@alex] to financial fraud detection [@fraud]. As such lots of research has gone into improving Classifiers. This section will cover the training of classifiers, various categories of classifiers and finally various types of classifiers used today.
 
-## Learning Strategies(?)
+## Learning Strategies
 
 Classification is in it's simplest form can be split into two distinct phases, the training phase: wherein the classifier learns how to classify samples, and the prediction phase: wherein the classifier actually attempts to classify distinct samples. But with more involved techniques and depending on when the training phase happens there exist multiple training strategies.
 
@@ -40,7 +40,7 @@ Depending on the number of classes in a dataset there exist two kinds of classif
 
 ### One vs All
 
-One vs All^[One vs All: Also known as One vs Rest (OVR), One Against All (OAA) or One Against Rest (OAR)] (OVA) [@ova-ovo] multiclass classifiers have a classifier for each class. For $n$ classes, $n$ binary classifiers are required, one for each class. Each binary classifier distinguishes whether a sample belongs to a specific class or not (or any of the rest)(?). To assign the final class label to the sample the class label with the highest prediction confidence is used.
+One vs All^[One vs All: Also known as One vs Rest (OVR), One Against All (OAA) or One Against Rest (OAR)] (OVA) [@ova-ovo] multiclass classifiers have a classifier for each class. For $n$ classes, $n$ binary classifiers are required, one for each class. Each binary classifier distinguishes whether a sample belongs to one specific class or if it belongs to any of the rest classes. To assign the final class label to the sample the class label with the highest prediction confidence is used.
 
 ### One vs One
 

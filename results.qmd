@@ -1,5 +1,78 @@
-# Results
+# Experimental Results
 
-results of different dataset size, different cards, DIFFERENT FLOATING POINT SIZES !!
+This section will go over the experiments and the results obtained.
 
-# References {.unnumbered}
+## Hardware
+
+Experiments were done on 2 systems, a personal workstation with a WSL (Windows Subsystem for Linux) based VM on a Windows 11 host, referred to as "WSL" and a dedicated headless GNU/Linux system provided by the university, referred to as "Headless". The specifications for the systems follow:
+
+
+| Component | Description |
+|-----------|-------------|
+| CPU | 6-core AMD Ryzen 5 3600 @ 3.60GHz |
+| RAM | 24 GB (12GiB allocated to VM) |
+| GPU | Nvidia GeForce 1060 |
+| VRAM | 6GB |
+
+Table: WSL System
+
+| Component | Description |
+|-----------|-------------|
+| CPU | 8-core AMD Ryzen 7 3700X @ 3.60GHz |
+| RAM | 66 GB |
+| GPU | Nvidia TITAN RTX |
+| VRAM | 24GB |
+
+Table: Headless System
+
+## Datasets
+
+### Linear
+
+A synthetic, linearly separable dataset of various sizes, from one thousand up to ten million, was generated using the python script in \autoref{lst-blob}. In all experiments the accuracy rate stayed above 98%, so no interesting comparisons are there to be made regarding accuracy. This dataset will be referred to as the "linear N",dataset past this point where $N$ is the number of samples .
+
+### Iris
+
+The iris dataset consists of 150 samples of 4 features of 3 types of iris plants, Iris Setosa, Iris Versicolor and Iris Virginica. The features are describing the sepal length, sepal width, petal length and petal width. Each class is represented by 50 samples. One of the classes is linearly separable in respect to the other two, but the other two are not linearly separable in respect to each other [@iris].
+
+
+```{r, code=readLines("./graph.R"), echo=FALSE, message=FALSE, warning=FALSE, cache=TRUE, cache.extra = tools::md5sum('./graph.R')}
+```
+
+## Baseline SMO vs GPUSVM
+
+All sizes of the linear dataset were used to compare the sequential and parallel implementations.
+
+```{r, results='asis', echo=FALSE, message=FALSE, fig.cap = "Training time of serial SMO and parallel GPUSVM", label="fig-cpuvgpu"}
+print(cpu_vs_gpu)
+```
+
+We can clearly see that the parallel implementation is several orders of magnitude faster, as long as the dataset is big enough. For small datasets the overhead of the parallel implementation was big enough that the sequential implementation completes training faster. It's important to note that results using the sequential implementation and a dataset size of 100000 (hundred thousand) and more do not exist, as the runtime to completion would measure in hours.
+
+
+## Varying Number of Threads
+
+Experiments were done using a varying numbers of threads on the linear dataset with 10 million samples. Recall that due to the use of cooperative kernels, the optimal number of blocks depends on the number of threads. The number of threads must be a power of two in order for the parallel grid reduction to function correctly. The numbers of threads experimented with were picked because the next smaller power of two as well the next bigger resulted in a misconfigured kernel launch.
+
+```{r, results='asis', echo=FALSE, message=FALSE, fig.cap = "Training time for differing thread count", label="fig-threads-1"}
+print(threads)
+```
+
+In \autoref{fig-threads-1}, we can see that a sweet spot exists between 64 and 128 threads, with 256 threads leading to a 20% increase of training time.
+
+## Small Datasets
+
+For small datasets, as seen before, we would expect the overhead of GPUSVM to actually introduce a significant slowdown when compared to Sequential SVM. This is indeed true as seen in \autoref{fig-datasets}.
+
+```{r, results='asis', echo=FALSE, message=FALSE, fig.cap = "Training time for small datasets by algorithm", label="fig-datasets"}
+print(datasets)
+```
+
+
+# Conclusions and Future work
+
+As seen from our experimental results the implementation of an efficient parallel classifier using CUDA can result in significant training time decrease when compared to sequential implementations. Our implementation was successful in leveraging the compute of the GPU of the systems we had available, but the implementation did not fully take advantage of the heterogeneous computing environment, that is to say, the CPU remained largely unused while the GPU did work. Furthermore implementation of different kernels other than the linear, dot product, kernel was unsuccessful.
+
+Future work should consider the performance impact that floating point precision, be it single, double, half or even quarter could have. It could lead to a significant speedup when training but caution should be exercised that the accuracy of the model is not degraded. Another interesting feature of a parallel SVM solver would be cooperative kernel evaluation, where threads cooperate to find kernel values, which could have a significant impact on the training speed of datasets with high dimensionality. Lastly fully taking advantage of a heterogeneous environment, implementing a hybrid SVM solver that can run on both the GPU and CPU, should be considered.
+
+With this and the massive body of research already available on the subject of GPGPU in mind, the benefits of use of GPUs for general purpose computing is evident.

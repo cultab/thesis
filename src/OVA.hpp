@@ -23,36 +23,38 @@ class OVA {
         : models(static_cast<idx>(shape.num_classes == 2 ? 1 : shape.num_classes)),
           params(_params) {
 
-        for (label /*class_id*/ cls = 0; static_cast<idx>(cls) < models.cols; cls++) {
+        for (label class_id = 0; static_cast<idx>(class_id) < models.cols; class_id++) {
             // IDEA: data.y mutate so that 1 for i and -1 for others
             // copy labels vector
             vector<label> labels = y;
             // mutate as mentioned
-            labels.mutate([cls](int l) -> int { return l == cls ? 1 : -1; });
+            labels.mutate([class_id](int l) -> int { return l == class_id ? 1 : -1; });
             // train svm
             auto model = new SVM_IMPL(shape,x, labels, this->params, kernel);
-            models[static_cast<idx>(cls)] = model;
+            models[static_cast<idx>(class_id)] = model;
         }
     }
 
-    void train() {
+    float train() {
+		float time = 0.0f;
         for (idx i = 0; i < models.cols; i++) {
-            printf("Training model %zu\n", i);
-            models[i]->train();
+            fprintf(stderr, "Training model %zu\n", i);
+            time += models[i]->train();
+            fprintf(stderr, "Done training model %zu\n", i);
             models[i]->compute_w();
-            printf("Done training model %zu\n", i);
-            printd(models[i]->w);
+            // printd(models[i]->w);
         }
+		return time;
     }
 
     std::tuple<label, math_t> predict(vector<math_t> sample) {
         label cls = 0;
         math_t max_pred = models[static_cast<idx>(cls)]->predict(sample);
-        printf("model %d: %f\n", cls, max_pred);
+        // printf("model %d: %f\n", cls, max_pred);
 
         for (idx i = 1; i < models.cols; i++) {
             math_t tmp = models[i]->predict(sample);
-            printf("model %zu: %f\n", i, tmp);
+            // printf("model %zu: %f\n", i, tmp);
             if (tmp > max_pred) {
                 cls = static_cast<label>(i);
                 max_pred = tmp;

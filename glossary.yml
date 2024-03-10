@@ -1,0 +1,24 @@
+SVM: |
+  Support Vector Machine: a data classification algorithm
+support vector: |
+  Samples on the margin of the separating hyperplane of an SVM.
+CUDA: |
+  Compute Unified Device Architecture: A GPGPU platform and library.
+GPU: |
+  Graphics Processing Unit: A hardware accelarator designed for use in image processing.
+GPGPU: |
+  General Purpose GPU computing: The use of GPUs for accelarion of tasks other than image processing.
+QP: |
+  Quadratic Programming: A family of techniques for solving optimization problems involving quadratic functions.
+SMO: |
+  Sequential Minimization Optimization: An SVM algorithm based on coordinate descent instead of reliying upon standard QP techniques.
+PSMO: |
+  Parallel SMO: A variant of SMO meant for use in parallel computing environments.
+Classifier: |
+  An algorithm that assigns class labels to data.
+OVA: |
+  One Versus All: A technique for using binary classifiers for multiclass classification, by training binary classifiers to separate samples into a specific class or one of the rest.
+OVR: |
+  One Versus Rest: see OVA.
+OVO: |
+  One Versus One:  A technique for using binary classifiers for multiclass classification, by training binary classifiers to separate samples into one of two classes and picking the class most picked.

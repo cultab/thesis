@@ -41,6 +41,10 @@ An iteration limit has also been used to stop training if it has been stuck slow
 
 The parallel implementation is heavily based on GPUSVM [@gpusvm] and P-SMO [@psmo]. The main difference when compared to GPUSVM is the use of cooperative kernels and grid synchronization in order to eliminate the need to move data from the host to the device and back at each iteration. Instead a grid wide reduction is implemented to obtain $b_{low}$ and $b_{up}$, seen in \autoref{lst-my-reduce}. The reduction implements the argmin and argmax operation at the same time, returning two results. In the first stage each CUDA thread finds a local max and min, as well as their indices. Next a block reduction is performed to obtain block local results which are then written to global device memory by each thread with `threadIdx.x == 0`. In the final stage a grid synchronization is performed and then the first block, the one with `blockIdx.x == 0`, performs a block reduction of the previously mentioned block local results and the results are written to global memory. Afterwards a grid synchronization is again performed and all threads read the results into their local memory.
 
+::: {.callout-warning}
+Attempting to run with too many threads, will cause the occupancy routine to return 0, so running will be canceled with an exit status of 1, and an appropriate error message.
+:::
+
 Because of the use of cooperative kernels, the optimal number of blocks to use can actually be very easily determined, dynamically. In \autoref{lst-blocks} we see the code used to achieve the optimal SM occupancy, the code is also available on the official CUDA documentation [@cudadocs]. This is done by querying the platform for the maximum number of active blocks per SM that can be used with a specific kernel and a specific number of threads.
 
 \AddToHookNext{env/verbatim/begin}{\tiny}
@@ -52,7 +56,6 @@ cudaGetDeviceProperties(&deviceProp, dev);
 cudaOccupancyMaxActiveBlocksPerMultiprocessor(&numBlocksPerSm, train_CUDA_model, THREADS, 0);
 dim3 dimBlock(THREADS, 1, 1);
 dim3 dimGrid(deviceProp.multiProcessorCount * numBlocksPerSm, 1, 1);
-printf("Using %u blocks!\n", dimGrid.x);
 ```
 
 ## Vector Library

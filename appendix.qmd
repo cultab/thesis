@@ -812,6 +812,176 @@ __device__ idx_tuple argMin(size_t shared_halfpoint) {
 }
 ```
 
+\AddToHookNext{env/verbatim/begin}{\tiny}
+```{#lst-train .cpp lst-cap="GPUSVM training device-side code"}
+__device__ void train_device(size_t shared_memory) {
+	a.set(0);
+
+	unsigned int tid = blockDim.x * blockIdx.x + threadIdx.x;
+	unsigned int stride = blockDim.x * gridDim.x;
+	grid_group blocks = this_grid();
+	thread_block threads = this_thread_block();
+	// IDEA: block locals ?
+
+	// thread locals
+	math_t K_lo_lo;
+	math_t K_up_up;
+	math_t K_lo_up;
+	math_t eta;
+	math_t a_lo_new;
+	math_t a_up_new;
+	math_t a_lo;
+	math_t a_up;
+	idx lo;
+	idx up;
+
+	// initialize indices
+	for (idx i = tid; i < indices.cols; i += stride) { // :^)
+		if (0 < a[i] && a[i] < C) {
+			indices[i] = BOTH;
+			continue;
+		}
+		if ((y[i] == 1 && a[i] == 0) || (y[i] == -1 && a[i] == C)) {
+			indices[i] = UP;
+		} else {
+			indices[i] = LOW;
+		}
+		// printf("[%d]: indices[%lu] = %s\n", tid, i, indices[i] == UP ? "UP" : indices[i] == LO ? "LO" : "BOTH");
+	}
+
+	// initialize error
+	// this->error.mutate([this] __device__(idx _i) -> idx { return -this->y[_i]; });
+	for (idx i = tid; i < error.cols; i += stride) {
+		error[i] = -y[i];
+	}
+	blocks.sync();
+
+	// pick b_up and _lo for the first time:
+	bool picked_lo = false;
+	bool picked_up = false;
+	if (tid == 0) {
+		for (idx i = 0; i < y.cols; i += 1) {
+			if (y[i] < 0) {
+				if (!picked_lo) {
+					lo = i;
+					picked_lo = true;
+					if (picked_up) {
+						break;
+					}
+				}
+			} else {
+				if (!picked_up) {
+					up = i;
+					picked_up = true;
+					if (picked_lo) {
+						break;
+					}
+				}
+			}
+		}
+```
+
+\AddToHookNext{env/verbatim/begin}{\tiny}
+```{#lst-train-2 .cpp lst-cap="GPUSVM training device-side code cont."}
+		K_lo_lo = Kernel(x[lo], x[lo]);
+		K_up_up = Kernel(x[up], x[up]);
+		K_lo_up = Kernel(x[lo], x[up]);
+		eta = K_lo_lo + K_up_up - 2 * K_lo_up;
+		math_t a_new = 2 / eta;
+		// write to global memory
+		dev_a_up_new = a_new;
+		dev_a_lo_new = a_new;
+		a[lo] = a_new;
+		a[up] = a_new;
+		dev_lo = lo;
+		dev_up = up;
+
+		// recalculate indices for lo and up
+		indices[up] = compute_type_for_index(up);
+		indices[lo] = compute_type_for_index(lo);
+	}
+	blocks.sync();
+	// read from global
+	a_lo_new = dev_a_lo_new;
+	a_up_new = dev_a_up_new;
+	lo = dev_lo;
+	up = dev_up;
+
+	for (idx i = tid; i < error.cols; i += stride) {
+		error[i] = error[i] - a_lo_new * Kernel(x[lo], x[i]) + a_up_new * Kernel(x[up], x[i]);
+	}
+
+	blocks.sync();
+	while (dev_b_lo > dev_b_up + 2 * tol) {
+
+		if (tid == 0) {
+			math_t sign = y[up] * y[lo];
+
+			K_lo_lo = Kernel(x[lo], x[lo]);
+			K_up_up = Kernel(x[up], x[up]);
+			K_lo_up = Kernel(x[lo], x[up]);
+
+			eta = K_lo_lo + K_up_up - 2 * K_lo_up;
+
+			// update a_I_up , a_I_lo
+
+			a_up = a[up];
+			a_lo = a[lo];
+
+			a_up_new = a_up + (y[up] * (error[lo] - error[up])) / eta + types::epsilon;
+
+			// clip new a_up
+			if (a_up_new > C) {
+				a_up_new = C;
+			} else if (a_up_new < 0) {
+				a_up_new = 0;
+			}
+
+			a_lo_new = a_lo + sign * (a_up - a_up_new);
+			// write to global
+			dev_a_up_new = a_up_new;
+			dev_a_lo_new = a_lo_new;
+		}
+		blocks.sync();
+		a_lo_new = dev_a_lo_new;
+		a_up_new = dev_a_up_new;
+		a_lo = dev_a_lo;
+		a_up = dev_a_up;
+```
+
+\AddToHookNext{env/verbatim/begin}{\tiny}
+```{#lst-train-3 .cpp lst-cap="GPUSVM training device-side code cont."}
+		// recalculate error
+		for (idx i = tid; i < error.cols; i += stride) {
+			error[i] = error[i] + (a_lo_new - a_lo) * y[lo] * Kernel(x[lo], x[i]) +
+						(a_up_new - a_up) * y[up] * Kernel(x[up], x[i]);
+		}
+		blocks.sync();
+
+		if (tid == 0) {
+			// set new alphas
+			a[lo] = a_lo_new;
+			a[up] = a_up_new;
+			// recompute index type for up and low
+			indices[lo] = compute_type_for_index(lo);
+			indices[up] = compute_type_for_index(up);
+		}
+		blocks.sync();
+
+		auto result = argMin(shared_memory);
+		up = result.a;
+		lo = result.b;
+
+		if (tid == 0) {
+			dev_b_lo = error[lo];
+			dev_b_up = error[up];
+		}
+		blocks.sync();
+	}
+	b = (dev_b_lo + dev_b_up) / 2;
+}
+```
+
 
 \AddToHookNext{env/verbatim/begin}{\tiny}
 ```{#lst-blob .python lst-cap="Linearly separable dataset generation script"}
@@ -843,36 +1013,53 @@ for name, size in sizes.items():
             print(y)
 ```
 
-| Execution time in seconds | Samples   | System     | Algorithm   |
-|---------------------------|-----------|------------|-------------|
-| 0.028410                  | 1000      | WSL        | SMO         |
-| 2.828395                  | 10000     | WSL        | SMO         |
-| 296.077942                | 100000    | WSL        | SMO         |
-| 0.178688                  | 1000      | WSL        | GPUSVM      |
-| 0.435904                  | 10000     | WSL        | GPUSVM      |
-| 0.696096                  | 100000    | WSL        | GPUSVM      |
-| 5.249376                  | 1000000   | WSL        | GPUSVM      |
-| 0.023468                  | 1000      | Headless   | SMO         |
-| 2.140797                  | 1000      | Headless   | SMO         |
-| 222.812546                | 10000     | Headless   | SMO         |
-| 0.138688     TEMP DATA    | 1000      | Headless   | GPUSVM      |
-| 0.335904     TEMP DATA    | 10000     | Headless   | GPUSVM      |
-| 0.596096     TEMP DATA    | 100000    | Headless   | GPUSVM      |
-| 5.149376     TEMP DATA    | 1000000   | Headless   | GPUSVM      |
+\AddToHookNext{env/logntable/begin}{\tiny}
+```{r, echo = FALSE, warning = FALSE, message = FALSE}
+#| label: tbl-raw-data1
+#| tbl-cap: Raw Data collected for "Training time of serial SMO and parallel GPUSVM"
+library(knitr)
+library(dplyr)
+library(stringr)
+data1_raw <- data1_raw[ , !(names(data1_raw) %in% c('dataset'))]
+data1_raw %>%
+	mutate(across('system', str_replace, 'rncp', 'Headless')) %>%
+	mutate(across('system', str_replace, 'wsl', 'WSL')) %>%
+	mutate(across('algo', str_replace, 'cpu', 'SMO')) %>%
+	mutate(across('algo', str_replace, 'gpu', 'GPUSVM')) %>%
+	kable(.,  col.names = c('Training Time', 'Number of Samples', 'System', 'Algorithm'), format.args = list(scientific = FALSE))
+```
+\AddToHookNext{env/logntable/begin}{\tiny}
+```{r, echo = FALSE, warning = FALSE, message = FALSE}
+#| label: tbl-raw-data2
+#| tbl-cap: Raw Data collected for "Training time for differing thread count"
+library(knitr)
+library(dplyr)
+library(stringr)
+data2_raw %>%
+	mutate(across('system', str_replace, 'rncp', 'Headless')) %>%
+	mutate(across('system', str_replace, 'wsl', 'WSL')) %>%
+	kable(.,  col.names = c('Threads', 'Blocks', 'Training Time', 'System'), format.args = list(scientific = FALSE))
+```
 
-Table: Raw "SMO vs GPUSVM" experimental data
-
-| Execution time in seconds      | Threads | Blocks | System      |
-|--------------------------------|---------|--------|-------------|
-| 34.257954                      | 256     | 10     | WSL         |
-| 26.162336                      | 128     | 30     | WSL         |
-| 25.906273                      | 64      | 60     | WSL         |
-| 34.257954     TEMP DATA        | 256     | 10     | Headless    |
-| 26.162336     TEMP DATA        | 128     | 30     | Headless    |
-| 25.906273     TEMP DATA        | 64      | 60     | Headless    |
-
-Table: Raw "Block x Thread" experimental data
+\AddToHookNext{env/logntable/begin}{\tiny}
+```{r, echo = FALSE, warning = FALSE, message = FALSE}
+#| label: tbl-raw-data3
+#| tbl-cap: Raw Data collected for "Training time for small datasets by algorithm"
+library(knitr)
+library(dplyr)
+library(stringr)
+data3_raw %>%
+	mutate(across('system', str_replace, 'rncp', 'Headless')) %>%
+	mutate(across('system', str_replace, 'wsl', 'WSL')) %>%
+	mutate(across('dataset', str_replace, 'iris', 'Iris')) %>%
+	mutate(across('dataset', str_replace, 'linear', 'Linear 1k')) %>%
+	mutate(across('method', str_replace, 'cpu', 'SMO')) %>%
+	mutate(across('method', str_replace, 'gpu', 'GPUSVM')) %>%
+	kable(.,  col.names = c('Algorithm', 'Dataset', 'Training Time', 'System'), format.args = list(scientific = FALSE))
+```
 
 ## Full Project
 
 The full project, including the source code, dataset helper scripts and the markdown source of this paper will be available online after publication at [this public repository](https://github.com/cultab/thesis).
+
+

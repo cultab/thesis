@@ -54,8 +54,8 @@ Each binary classifier labels whether a sample belongs to one of it's two classe
 
 ## Linear Classifiers {#sec:linear}
 
-A linear classifier is a classifier that can only correctly predict the class of all it's inputs correctly if the dataset is linearly separable.
-For a dataset to be linearly separable there must exist at least one hyperplane^[a subset with dimension $n-1$ where $n$ is the dimension of the dataset] that can create two half-spaces where each one only contains one class of samples(?).
+A linear classifier is a classifier that can only correctly predict the class of all it's inputs if the dataset is linearly separable.
+For a dataset to be linearly separable there must exist at least one hyperplane^[a subset with dimension $n-1$ where $n$ is the dimension of the dataset] that can create two half-spaces where each one only contains one class of samples.
 
 more abstractly a set $X$ with distinct subsets $X_0$ and $X_1$ is said to be linearly separable if there exist $n+1$, $w_1, w_2, \unicodeellipsis, w_n, k$ where $w_i, k \in \BbbR$ satisfying
 
@@ -70,7 +70,7 @@ Non linear classifiers do not have this limitation.
 
 ## Classifiers
 
-This subsection will go over a number of classifiers, as well as (their way of operation)(?). It will also go over the basics of SVM, but more details will be given in \nameref{sec:SVM}
+This subsection will go over a number of classifiers, as well as their way of operation. It will also go over the basics of SVM, but more details will be given in \nameref{sec:SVM}
 
 ### Perceptron
 
@@ -130,7 +130,7 @@ It is loosly related and not to be confused with the Kmeans clustering algorithm
 
 #### Training and Prediction with k-NNs
 
-As mentioned before, training such a model is very simple as it only involves storing the training inputs and their coresponding labels. The important part is correctly choosing an $k$ for the number of neighbors and the distance metric ---both depend on the dataset used. Selecting the value for $k$ requires the use of heuristic hyperparameter optimization techniques, which will be covered in !SOMEWHERE! <!-- TODO: reference the section from SVM -->. Appart from hyperparameter optimization, it can also benefit from dimensionallity reduction of the feature space, which will be also covered in <!-- TODO: above -->.
+As mentioned before, training such a model is very simple as it only involves storing the training inputs and their coresponding labels. The important part is correctly choosing an $k$ for the number of neighbors and the distance metric ---both depend on the dataset used. Selecting the value for $k$ requires the use of heuristic hyperparameter optimization techniques. Apart from hyperparameter optimization, it can also benefit from dimensionality reduction of the feature space.
 The distance metric can be any Minkowski distance or in the case of text classfication a Levenshtein distance [@Levenshtein] can be used, again it highly depends on the shape of the data. Afterwards for a chosen $N$, predicting the class of an input is as simple as finding the $N$ closest training inputs
 
 ### Naive Bayes

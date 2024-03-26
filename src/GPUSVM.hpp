@@ -172,12 +172,17 @@ class GPUSVM {
         cudaDeviceGetAttribute(&supportsCoopLaunch, cudaDevAttrCooperativeLaunch, dev);
 		if (!supportsCoopLaunch) {
 			fprintf(stderr, "Cooperative kernels are not supported on this hardware\n!");
+			exit(1);
 		}
         /// This will launch a grid that can maximally fill the GPU, on the default stream with kernel arguments
         int numBlocksPerSm = 0;
         // Number of threads my_kernel will be launched with
         cudaGetDeviceProperties(&deviceProp, dev);
         cudaOccupancyMaxActiveBlocksPerMultiprocessor(&numBlocksPerSm, train_CUDA_model, THREADS, 0);
+		if (numBlocksPerSm == 0) {
+			fprintf(stderr, "Too many threads(%d) requested, leading to no available blocks per SM!\n", THREADS);
+			exit(1);
+		}
         dim3 dimBlock(THREADS, 1, 1);
         dim3 dimGrid(deviceProp.multiProcessorCount * numBlocksPerSm, 1, 1);
 		printf("Using %u blocks!\n", dimGrid.x);
@@ -451,6 +456,7 @@ class GPUSVM {
         thread_block threads = this_thread_block();
         grid_group blocks = this_grid();
 
+		assert(blockDim.x >= gridDim.x);
         extern __shared__ char shared_memory[];
 
         // __shared__ idx sindx[THREADS * 2];
@@ -479,7 +485,6 @@ class GPUSVM {
             cur_min = a[tid];
             // thread local arg min|max
             for (idx i = tid + stride; i < a.cols; i += stride) {
-                // TODO: Take into account indices up, low and both
                 auto kind = indices[i];
                 auto tmp = a[i]; // save to local, so it's accessed only once
                 if (kind == UP || kind == BOTH) {

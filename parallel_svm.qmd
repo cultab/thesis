@@ -6,7 +6,7 @@ The use of parallelization techniques for speeding up SVM has been the topic of 
 
 ## Parallelization Techniques
 
-There many parallelization techniques that show up in the available body of research. One of them being the parallelization of the SVM algorithm itself. Another one is the division of big training sets into smaller parts and then training SVMs on those in parallel with the goal of having a smaller working set of the dataset in memory. Another techniques employed has been parallel grid search, where multiple version of the same model are trained side by side, with different hyperparametes, in order to find the optimal hyperparametes for a given dataset.
+There many parallelization techniques that show up in the available body of research. One of them being the parallelization of the SVM algorithm itself. Another one is the division of big training sets into smaller parts and then training SVMs on those in parallel with the goal of having a smaller working set of the dataset in memory. Another technique employed has been parallel grid search, where multiple version of the same model are trained side by side, with different hyperparametes, in order to find the optimal hyperparametes for a given dataset.
 
 <!-- TODO: use Parallel Computing of Support Vector Machines: A Survey -->
 
@@ -166,7 +166,6 @@ w &\leftarrow w - \gamma_t \begin{cases}
 b &= y - w, x\label{eq:bee}
 \end{align}
 
-
 ### Results
 
 Experiments were carried out on a system equipped with a dual-core Intel Xeon CPU @ 2.20 GHz with 12GBs of RAM and an NVIDIA Tesla V100 SXM2 with 16GBs of VRAM. They concluded that the use of SVM-SMO-SDG resulted in further speedups and a significant decrease in memory usage, all while maintaining prediction accuracy.
@@ -174,3 +173,22 @@ Experiments were carried out on a system equipped with a dual-core Intel Xeon CP
 ::: {.callout-note}
 SVM-SMO-SDG also maintained a comparable number of support vectors produced to SMO, as opposed to PCV that produced significantly more.
 :::
+
+## C-SVM
+
+Cascade Support Vector Machines of C-SVMs, first developed by @csvm, employ the second kind of parallelization mentioned in the intro of this chapter, that is, they partition the dataset into subsets and using layers of SVMs, they extract the support vectors that get passed onto the next layer. Essentially each layer of the network acts like a filter that separates important support vectors from useless data points with only the most important support vectors remaining at the end. A formal proof of convergence exists on the original paper introducing C-SVMs [@csvm]. Intuitively, data points of a subset that exist in the margin between two classes, are likely to also exist close to the margin of the entire dataset. Also the converse must also hold true, with non-support vectors found in a subset of the dataset also not being support vectors of the entire dataset.
+
+![Architecture of a binary Cascade SVM [@csvm]](./img/c-svm.png){width=50%}
+
+### Results
+
+Experiments where performed on a system with a single processor as well as on a cluster of 16 machines, each equipped with a dual-core AMD 1800 and 2GBs of RAM. Kernel evaluations saw a significant decrease of as much as 30%. A speedup of five to up to ten times was observed as well as improvements in storage requirements. The accuracy of the resulting models was equivalent or better to that of traditional SVMs, after convergence was achieved, although satisfactory accuracy could be obtained with even a single pass through the network.
+
+
+## ECM
+
+Extreme Cascade Machines (ECM)s is an extension of C-SVMs where Dimensionality Reduction (DR) is employed in order to reduce the computation requirements of the training. The use of DR is aimed at reducing the number of features used for training to speedup training and potentially improve accuracy.
+
+### Results
+
+Experiments were performed using both Principal Component Analysis (PCA), ISOMAP and Locally Linear Embedding (LLE) for DR. PCA-SVM showed the greatest speedup compared to C-SVM, as well as higher accuracy, even succeeding in training where C-SVM did not successfully complete.

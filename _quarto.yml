@@ -83,6 +83,8 @@ lang: en # rec
 bibliography: bibliography.bib
 biblio-style: ieee
 biblatexoptions: sorting=none
+nocite: |
+  @R, @tidyr, @ggplot, @scales, @quarto
 
 # latex-auto-mk: false
 

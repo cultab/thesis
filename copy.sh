@@ -21,6 +21,6 @@ EOF
 )
 
 for file in $files; do
-	cp -rfv "./src/$file" ./server/src/
+	cp -rfv --update "./src/$file" ./server/src/
 done
 

@@ -1,10 +1,10 @@
 # Experimental Results
 
-This section will go over the experiments and the results obtained.
+This section will go over the experiments and the results obtained as well as the datasets used to perform the experiments.
 
 ## Hardware
 
-Experiments were done on 2 systems, a personal workstation with a WSL (Windows Subsystem for Linux) based VM on a Windows 11 host, referred to as "WSL" and a dedicated headless GNU/Linux system provided by the university, referred to as "Headless". The specifications for the systems follow:
+Experiments were done on 2 systems, a personal workstation with a WSL (Windows Subsystem for Linux) based VM on a Windows 11 host, referred to as "WSL" from this point on, and a dedicated headless GNU/Linux system provided by the university, referred to as "Headless" from this point on. The hardware specifications for the systems follow in \autoref{tbl-wsl} and \autoref{tbl-rncp}.
 
 
 | Component | Description |
@@ -14,7 +14,7 @@ Experiments were done on 2 systems, a personal workstation with a WSL (Windows S
 | GPU | Nvidia GeForce 1060 |
 | VRAM | 6GB |
 
-Table: WSL System
+Table: WSL System \label{tbl-wsl}
 
 | Component | Description |
 |-----------|-------------|
@@ -23,7 +23,7 @@ Table: WSL System
 | GPU | Nvidia TITAN RTX |
 | VRAM | 24GB |
 
-Table: Headless System
+Table: Headless System \label{tbl-rncp}
 
 ## Datasets
 
@@ -33,7 +33,7 @@ A synthetic, linearly separable dataset of various sizes, from one thousand up t
 
 ### Iris
 
-The iris dataset consists of 150 samples of 4 features of 3 types of iris plants, Iris Setosa, Iris Versicolor and Iris Virginica. The features are describing the sepal length, sepal width, petal length and petal width. Each class is represented by 50 samples. One of the classes is linearly separable in respect to the other two, but the other two are not linearly separable in respect to each other [@iris].
+The iris dataset consists of 150 samples of 4 features of 3 types of iris plants, Iris Setosa, Iris Versicolor and Iris Virginica. The features are describing the sepal length, sepal width, petal length and petal width. Each class is represented by 50 samples. One of the classes is linearly separable in respect to the other two, but the other two are not linearly separable in respect to each other [@iris]. Due to the separability discussed above, the accuracy of our classifier was low, as to be expected since it's only a linear classifier.
 
 
 ```{r, code=readLines("./graph.R"), echo=FALSE, message=FALSE, warning=FALSE, cache=TRUE, cache.extra = tools::md5sum('./graph.R')}
@@ -41,38 +41,38 @@ The iris dataset consists of 150 samples of 4 features of 3 types of iris plants
 
 ## Baseline SMO vs GPUSVM
 
-All sizes of the linear dataset were used to compare the sequential and parallel implementations.
+All sizes of the linear dataset were used to compare the sequential and parallel implementations. In \autoref{fig-cpuvgpu} we can clearly see that the parallel implementation is several orders of magnitude faster than the sequential implementation, as long as the dataset is big enough. For small datasets the overhead of the parallel implementation should be big enough that the sequential implementation is expected completes training faster. It's important to note that results using the sequential implementation and a dataset size of 100000 (hundred thousand) and more do not exist, as the runtime to was prohibitively large, as shown by the regression represented by the dotted line. The data used can be seen in \autoref{tbl-raw-data1}.
 
-```{r, results='asis', echo=FALSE, message=FALSE, fig.cap = "Training time of serial SMO and parallel GPUSVM", label="fig-cpuvgpu"}
+```{r, results='asis', echo=FALSE, message=FALSE, warning = FALSE, fig.cap = "Training time of serial SMO and parallel GPUSVM", label="fig-cpuvgpu"}
 print(cpu_vs_gpu)
 ```
 
-We can clearly see that the parallel implementation is several orders of magnitude faster, as long as the dataset is big enough. For small datasets the overhead of the parallel implementation was big enough that the sequential implementation completes training faster. It's important to note that results using the sequential implementation and a dataset size of 100000 (hundred thousand) and more do not exist, as the runtime to completion would measure in hours.
 
 
 ## Varying Number of Threads
 
-Experiments were done using a varying numbers of threads on the linear dataset with 10 million samples. Recall that due to the use of cooperative kernels, the optimal number of blocks depends on the number of threads. The number of threads must be a power of two in order for the parallel grid reduction to function correctly. The numbers of threads experimented with were picked because the next smaller power of two as well the next bigger resulted in a misconfigured kernel launch.
+Experiments were done using a varying numbers of threads on the linear dataset with 10 million samples. Recall that due to the use of cooperative kernels, the optimal number of blocks depends on the number of threads and the GPU installed in the system. Given that number of threads must be a power of two and such that `blockDim.x >= gridDim.x`, or more clearly such that there are more threads per block than blocks, in order for the parallel grid reduction to function correctly, the number of threads experimented with were picked such that the above hold true. In \autoref{fig-threads-1}, we can see that the number of threads can have a significant effect on the training time, with one experiment resulting in a 20% slowdown compared to the rest. The data used can be seen in \autoref{tbl-raw-data2}.
 
-```{r, results='asis', echo=FALSE, message=FALSE, fig.cap = "Training time for differing thread count", label="fig-threads-1"}
+```{r, results='asis', echo=FALSE, message=FALSE, warning = FALSE, fig.cap = "Training time for differing thread count", label="fig-threads-1"}
 print(threads)
 ```
 
-In \autoref{fig-threads-1}, we can see that a sweet spot exists between 64 and 128 threads, with 256 threads leading to a 20% increase of training time.
 
 ## Small Datasets
 
-For small datasets, as seen before, we would expect the overhead of GPUSVM to actually introduce a significant slowdown when compared to Sequential SVM. This is indeed true as seen in \autoref{fig-datasets}.
+For small datasets, as seen before, we would expect the overhead of GPUSVM to actually introduce a significant slowdown when compared to Sequential SVM. But, as it turns out this is not always true. In \autoref{fig-datasets} we see that if the GPU is powerful enough, the parallel implementation can actually compete, even for small datasets, as show by the data for the Linear 1k dataset on the Headless system equipped with the Nvidia TITAN RTX. The data used can be seen in \autoref{tbl-raw-data3}.
 
-```{r, results='asis', echo=FALSE, message=FALSE, fig.cap = "Training time for small datasets by algorithm", label="fig-datasets"}
+```{r, results='asis', echo=FALSE, message=FALSE, warning = FALSE, fig.cap = "Training time for small datasets by algorithm", label="fig-datasets"}
 print(datasets)
 ```
 
 
 # Conclusions and Future work
 
-As seen from our experimental results the implementation of an efficient parallel classifier using CUDA can result in significant training time decrease when compared to sequential implementations. Our implementation was successful in leveraging the compute of the GPU of the systems we had available, but the implementation did not fully take advantage of the heterogeneous computing environment, that is to say, the CPU remained largely unused while the GPU did work. Furthermore implementation of different kernels other than the linear, dot product, kernel was unsuccessful.
+As seen from our experimental results the implementation of an efficient parallel classifier using CUDA can result in significant training time decrease when compared to sequential implementations. Our implementation was successful in leveraging the compute of the GPU of the systems we had available, but the implementation did not fully take advantage of the heterogeneous computing environment, that is to say, the CPU remained largely unused while the GPU did work. Furthermore implementation of different kernels other than the linear, dot product, kernel was unsuccessful. We also showed that the hardware used has a significant effect on the training time.
+
+Work was attempted in order to consider the performance impact of different floating point precisions, but changing the floating point precision from *double* to *single* was harder than expected, with *half* precision requiring major rework of the code base.
 
 Future work should consider the performance impact that floating point precision, be it single, double, half or even quarter could have. It could lead to a significant speedup when training but caution should be exercised that the accuracy of the model is not degraded. Another interesting feature of a parallel SVM solver would be cooperative kernel evaluation, where threads cooperate to find kernel values, which could have a significant impact on the training speed of datasets with high dimensionality. Lastly fully taking advantage of a heterogeneous environment, implementing a hybrid SVM solver that can run on both the GPU and CPU, should be considered.
 
-With this and the massive body of research already available on the subject of GPGPU in mind, the benefits of use of GPUs for general purpose computing is evident.
+With this and the massive body of research already available on the subject of GPGPU in mind, the benefits of use of GPUs for general purpose computing is evident. Leveraging GPUs for accelerating the training of SVMs can induce a massive speedup on training time.

@@ -2,38 +2,32 @@ project:
   render:
     - Thesis.qmd
 
-title: "Parallel Classification using Support Vector Machines on Modern GPUs"
-subtitle: |
-    | Πανεπιστήμιο Δυτικής Αττικής
-    | \includegraphics{./img/logo.jpg}
-    | Τμήμα Μηχανικών Πληροφορικής και Υπολογιστών
+university-logo: ./img/logo.jpg
+
+title: DIPLOMA THESIS
+subtitle: "Parallel Classification using Support Vector Machines on Modern GPUs"
+university: University of Western Attica
+department: Department of Informatics and Computer Engineering
+author: Evangelos Katsandris
+supervisor: Mamalis Vasileios
+
+title-el: ΔΙΠΛΩΜΑΤΙΚΗ ΕΡΓΑΣΙΑ
+subtitle-el:
+  - Παράλληλη Κατηγοριοποίηση Δεδομένων με χρήση
+  - Μηχανών Διανυσμάτων Υποστήριξης (SVMs) σε Περιβάλλον
+  - Σύγχρονων Καρτών Γραφικών (GPUs)
+university-el: Πανεπιστήμιο Δυτικής Αττικής
+department-el: Τμήμα Μηχανικών Πληροφορικής και Υπολογιστών
+author-el: Ευάγγελος Κατσανδρής
+supervisor-el: Μάμαλης Βασίλειος
+
 date: now
-date-format: dddd MMMM D, YYYY
-# author: Ευάγγελος Κατσανδρής (cs171014@uniwa.gr)
-author:
-  - name: Ευάγγελος Κατσανδρής
-    # id: jc
-    # orcid: 0000-0002-1825-0097
-    email: cs171014@uniwa.gr
-    affiliation: 
-      - name: University of West Attica
-        city: Athens
-        department: Computer Engineering and Informatics
-        # state: RI
-        url: www.uniwa.gr
-# abstract: > 
-#   This is the abstract words. Another sentence.
-# thanks: > 
-#   This is the thanks section. Sentence two!
+date-el: Μάρτιος 2024
+date-format: MMMM YYYY
 license: "CC BY"
 copyright: 
-  holder: Ευάγγελος Κατσανδρής
+  holder: Evangelos Katsandris
   year: 2024
-# citation: 
-#   container-title: Journal of Psychoceramics
-#   volume: 1
-#   issue: 1
-#   doi: 10.5555/12345678
 funding: "The author received no specific funding for this work."
 
 glossary:
@@ -44,7 +38,7 @@ format:
     wordcount-pdf:
         # template: /home/evan/.pandoc/templates/eisvogel.latex
         # template: /home/evan/.pandoc/templates/new.latex # rec
-        # template: ./template.latex
+        template: ./my_template.latex
         toc: false
         number-depth: 3
         number-sections: true
@@ -94,7 +88,7 @@ nocite: |
 #
 # code-block-font-size: \footnotesize
 # table-use-row-colors: true
-# titlepage: true
+titlepage: false
 # titlepage-rule-color: 123c64 # #123c64
 # titlepage-rule-height: 10
 # caption-justification: centering
